@@ -1,0 +1,16 @@
+# PyCharm service folder
+.idea
+*__pycache__
+
+# Python virtual environment
+.venv
+
+# dbs
+*.db
+*.db-journal
+
+# research
+*.ipynb_checkpoints
+*.xlsx
+*.csv
+*tmp*
