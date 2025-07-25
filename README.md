@@ -1,1 +1,1 @@
-# Repository with population/genetic algorithms
+# Repository of population/genetic algorithms
