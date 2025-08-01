@@ -2,9 +2,26 @@ from pathlib import Path
 
 import numpy as np
 
+
 class GNBG:
     """Load GNBG functions for testing."""
-    def __init__(self, func_num: int):
+
+    def __init__(self, func_num: int, verbose: bool = False):
+        self.sigma_matrices = None
+        self.lambda_ = None
+        self.omega = None
+        self.mu = None
+        self.opt_position = None
+        self.opt_value = None
+        self.verbose = verbose
+        self.rotation_matrix = None
+        self.comp_min_pos = None
+        self.max_coord = None
+        self.min_coord = None
+        self.comp_num = None
+        self.dimension = None
+        self.acceptance_threshold = None
+        self.max_evals = None
         self.func_num = func_num
         self.path_to_func = Path('..', '_gnbg_functions')
         self.load_parameters()
@@ -44,8 +61,9 @@ class GNBG:
 
             if len(cleaned_matrix) == self.dimension:
                 self.rotation_matrix = np.array(cleaned_matrix)
-        except:
-            pass
+        except Exception as e:
+            if self.verbose:
+                print(e)
 
         opt_value_line = matrix_start + self.dimension
         while opt_value_line < len(lines):
