@@ -66,14 +66,14 @@ class GNBG:
                 print(e)
 
         opt_value_line = matrix_start + self.dimension
-        while opt_value_line < len(lines):
-            try:
-                float(lines[opt_value_line])
-                break
-            except ValueError:
+        while opt_value_line < len(lines) \
+            and not lines[opt_value_line].replace('.', '', 1).replace('-', '',1).strip().isdigit():
                 opt_value_line += 1
-
-        self.opt_value = float(lines[opt_value_line])
+        try:
+            self.opt_value = float(lines[opt_value_line])
+        except IndexError:
+            opt_value_line = len(lines) - 2
+            self.opt_value = float(lines[opt_value_line])
         self.opt_position = np.array(
             [float(x) for x in lines[opt_value_line + 1].split()[:self.dimension]]
         )
