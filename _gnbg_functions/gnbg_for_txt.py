@@ -4,7 +4,7 @@ import numpy as np
 
 
 class GNBG:
-    """Load GNBG functions for testing."""
+    """Load GNBG functions as txt-files for testing."""
 
     def __init__(self, func_num: int, verbose: bool = False):
         self.sigma_matrices = None

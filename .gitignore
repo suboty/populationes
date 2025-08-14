@@ -16,5 +16,9 @@
 *tmp*
 *.pdf
 
+# files of GNBG functions
+_gnbg_functions/*.txt
+_gnbg_functions/*.mat
+
 # other
 *.DS_Store
