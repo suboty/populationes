@@ -17,7 +17,7 @@
 *.pdf
 
 # files of GNBG functions
-_gnbg_functions/*.mat
+*.mat
 
 # other
 *.DS_Store
