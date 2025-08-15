@@ -19,7 +19,7 @@
   ],
   "min_sigma": -4500,
   "max_sigma": -4000,
-  "overlapping": 2
+  "overlapping": 2,
   "component_sigma": [
     -4470.4,
     -4399.9,
