@@ -23,7 +23,7 @@ class GNBG:
         self.acceptance_threshold = None
         self.max_evals = None
         self.func_num = func_num
-        self.path_to_func = Path('..', '_gnbg_functions')
+        self.path_to_func = Path('..', '_gnbg_functions', 'txt')
         self.load_parameters()
         self.prepare_components()
 
@@ -31,7 +31,6 @@ class GNBG:
         with open(Path(self.path_to_func, f"f{self.func_num}.txt"), "r") as f:
             lines = [line.strip() for line in f.readlines() if line.strip()]
 
-        # Загружаем основные параметры
         self.max_evals = int(float(lines[0]))
         self.acceptance_threshold = float(lines[1])
         self.dimension = int(float(lines[2]))
