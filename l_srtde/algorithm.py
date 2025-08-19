@@ -1,7 +1,9 @@
+import time
 import random
-from typing import List, Callable, Any
+from typing import List, Callable, Union
 
 import numpy as np
+import numpy.typing as npt
 
 
 class AlgorithmConst:
@@ -30,8 +32,9 @@ class AlgorithmGLobals:
         eval_steps:
             массив контрольных значений оценки,
             в котором будет храниться ошибка оптимизации.
-        results_array: хранит значения отклонения от оптимума (ошибки).
-        best_of_best_array: хранит текущие значения оптимума.
+        error_array: хранит значения отклонения от оптимума (ошибки).
+        best_of_best_array: хранит значения оптимума.
+        sr_array: хранит значения истории успешности.
         last_eval_step: счетчик для хранения последнего шага оценки.
         eval_func_calls: счетчик для хранения количества текущих вызовов целевой функции.
         max_eval_func_calls: максимальное количество вызовов целевой функции (ограничение).
@@ -41,8 +44,9 @@ class AlgorithmGLobals:
         global_best_init: булев флаг для инициализации global_best.
     """
     eval_steps = np.zeros(AlgorithmConst.records_number_per_function - 1)
-    results_array = np.zeros(AlgorithmConst.records_number_per_function)
+    error_array = np.zeros(AlgorithmConst.records_number_per_function)
     best_of_best_array = np.zeros(AlgorithmConst.records_number_per_function)
+    sr_array = np.zeros(AlgorithmConst.records_number_per_function)
     last_eval_step = 0
     eval_func_calls = 0
 
@@ -90,10 +94,10 @@ random_generator = AlgorithmRandomGenerators(seeds=[
 
 
 def quick_sort_with_indices(
-        array: np.ndarray | List[Any],
-        left: int = 0, right:
-        int = None,
-        indices: np.ndarray | List[Any] = None
+        array: Union[npt.NDArray[np.float64], List[float]],
+        left: int = 0,
+        right: int = None,
+        indices: Union[npt.NDArray[np.float64], List[float]] = None
 ):
     """Быстрая сортировка на месте с соответствующим отслеживанием индекса."""
     if right is None:
@@ -140,6 +144,8 @@ class Algorithm:
     """Python-имплементация L-STRDE алгоритма."""
 
     def __init__(self, fitness_function: Callable, verbose: bool = True):
+        self.is_last_call = False
+        self.t0 = time.time()
         self.verbose = verbose
 
         # Шаг 1: Инициализация целевой функции
@@ -282,14 +288,14 @@ class Algorithm:
 
     def mean_wl(
             self,
-            array: np.ndarray | List,
-            temp_weights: np.ndarray | List
+            array: Union[npt.NDArray[np.float64], List[float]],
+            temp_weights: Union[npt.NDArray[np.float64], List[float]],
+            is_need_cleaning: bool = False
     ) -> float:
         """
-        Функция возвращает адаптивное значение Cr,
-        основанное на успешных значениях Cr
-        из предыдущего поколения, с учетом того,
-        насколько они улучшили результат.
+        Функция возвращает адаптивное значение параметра,
+        основанное на успешных значениях из предыдущего поколения,
+        с учетом того, насколько они улучшили результат.
         """
         sum_weight = 0
         sum_square = 0
@@ -310,9 +316,16 @@ class Algorithm:
             _sum += weights[i] * array[i]
 
         if abs(_sum) > 1e-8:
-            return sum_square / _sum
+            result = sum_square / _sum
         else:
-            return 1.0
+            result = 1.0
+
+        if is_need_cleaning:
+            array[:self.success_filled] = 0.0
+            temp_weights[:self.success_filled] = 0.0
+            self.success_filled = 0
+
+        return result
 
     def find_n_save_best(self, init, ind_iter):
         """
@@ -331,10 +344,10 @@ class Algorithm:
         """
         temp = self._global_variables.global_best - self._global_variables.eval_func_opt_value
         if temp <= 1e-8 \
-                and self._global_variables.results_array[
+                and self._global_variables.error_array[
             self._consts.records_number_per_function - 1
         ] == self._global_variables.max_eval_func_calls:
-            self._global_variables.results_array[
+            self._global_variables.error_array[
                 self._consts.records_number_per_function - 1
                 ] = self._global_variables.eval_func_calls
 
@@ -346,18 +359,20 @@ class Algorithm:
             ]:
                 if temp <= 1e-8:
                     temp = 0
-                self._global_variables.results_array[step_eval_func_count] = temp
-                self._global_variables.last_eval_step = step_eval_func_count
+
+                # Обновление результирующих массивов
+                self._global_variables.error_array[step_eval_func_count] = temp
                 self._global_variables.best_of_best_array[step_eval_func_count] = self._global_variables.global_best
+                self._global_variables.sr_array[step_eval_func_count] = self.success_rate
+
+                self._global_variables.last_eval_step = step_eval_func_count
 
     @staticmethod
     def reflect(val, left, right):
-        """Отражение элемента при лимитах границ."""
-        if val < left or val > right:
-            span = right - left
-            val = left + abs((val - left) % (2 * span))
-            if val > right:
-                val = right - (val - right)
+        if val < left:
+            return left + (left - val)
+        elif val > right:
+            return right - (val - right)
         return val
 
     def remove_worst(self, _n_inds_front: int, new_n_inds_front: int):
@@ -399,6 +414,9 @@ class Algorithm:
 
     def main_cycle(self):
         """Запуск алгоритма L-SRTDE."""
+        if self.verbose:
+            print(f"Starting main cycle: max evals {self._global_variables.max_eval_func_calls}")
+
         # Шаг 6: Инициализация fitness значений для стартовой популяции
         for i_inds in range(self.n_inds_front):
             self.fitness_func_values[i_inds] = self.fitness_function(self.population[i_inds])
@@ -441,15 +459,27 @@ class Algorithm:
         # Пока не дойдем до максимума вычислений целевой функции
         while self._global_variables.eval_func_calls < self._global_variables.max_eval_func_calls:
 
+            _dif_calls = self._global_variables.max_eval_func_calls - self._global_variables.eval_func_calls
+            if self.verbose and _dif_calls < 50_000 and not self.is_last_call:
+                print(f'### Left {_dif_calls} calls')
+                self.is_last_call = True
+
             _max_calls = self._global_variables.max_eval_func_calls
             _current_calls = self._global_variables.eval_func_calls
 
-            if self.verbose:
+            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
                 print(
                     f'--- Iteration {self.iter_number}, '
-                    f'left {_max_calls - _current_calls} calls, '
-                    f'current best fitness value: {self._global_variables.global_best}'
+                    f'left {_max_calls-_current_calls} calls, '
+                    f'current best fitness value: {self._global_variables.global_best}, '
+                    f'elapsed: {round(time.time()-self.t0, 2)} seconds'
                 )
+                self.t0 = time.time()
+
+            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
+                print(f"\t Iteration {self.iter_number}: evals={self._global_variables.eval_func_calls}, "
+                      f"current best={self._global_variables.global_best}, "
+                      f"success_rate={self.success_rate:.3f}, n_inds_front={self.n_inds_front}")
 
             # Расчет параметров
             # Шаг 8.D.a
@@ -504,6 +534,8 @@ class Algorithm:
             # Шаг 8: Итерируемся по фронтовой части популяции
             for i_ind in range(self.n_inds_front):
 
+                verbose_i = self._random_generators.random_integers(low=0, high=self.n_inds_front, size=3)
+
                 # Выбираем индекс из фронтовой части популяции
                 self.chosen_index = self._random_generators.random_integers(
                     low=0, high=self.n_inds_front - 1
@@ -524,7 +556,15 @@ class Algorithm:
                         low=0, high=p_size_val - 1
                     )
                 ]
-                while p_rand == chosen_pop_idx:
+                max_at, at = 100, 0
+                while p_rand == chosen_pop_idx and max_at < at:
+                    p_rand = self.indices[
+                        self._random_generators.random_integers(
+                            low=0, high=p_size_val - 1
+                        )
+                    ]
+                    at += 1
+                if at == max_at:
                     p_rand = self.indices[
                         self._random_generators.random_integers(
                             low=0, high=p_size_val - 1
@@ -539,21 +579,34 @@ class Algorithm:
                     )
                 ]
                 Rand1_pop = self.indices2[Rand1]
-                while Rand1_pop == p_rand or Rand1_pop == chosen_pop_idx:
+                max_at, at = 100, 0
+                while (Rand1_pop == p_rand or Rand1_pop == chosen_pop_idx) and max_at < at:
                     Rand1 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=self.n_inds_front - 1
                         )
                     ]
                     Rand1_pop = self.indices2[Rand1]
+                    at += 1
+                if at == max_at:
+                    Rand1 = self.indices2[
+                        self._random_generators.random_integers(
+                            low=0, high=p_size_val - 1
+                        )
+                    ]
 
                 # Выбор Rand2, не равного p_rand и Rand1
                 # Шаг 8.D.i.ii
                 Rand2 = self.indices2[component_selector_front()]
                 Rand2_pop = self.indices2[Rand2]
-                while Rand2_pop == p_rand or Rand2_pop == Rand1_pop or Rand2_pop == chosen_pop_idx:
+                max_at, at = 100, 0
+                while (Rand2_pop == p_rand or Rand2_pop == Rand1_pop
+                       or Rand2_pop == chosen_pop_idx) and max_at < at:
                     Rand2 = self.indices2[component_selector_front()]
                     Rand2_pop = self.indices2[Rand2]
+                    at += 1
+                if max_at == at:
+                    Rand2 = self.indices2[component_selector_front()]
 
                 # Выбор Rand2, не равного p_rand, Rand1 и Rand2
                 # Шаг 8.D.i.iii
@@ -562,7 +615,16 @@ class Algorithm:
                         low=0, high=self.n_inds_front - 1
                     )
                 ]
-                while Rand3 == p_rand or Rand3 == Rand1_pop or Rand3 == Rand2_pop or Rand3 == chosen_pop_idx:
+                max_at, at = 100, 0
+                while (Rand3 == p_rand or Rand3 == Rand1_pop
+                       or Rand3 == Rand2_pop or Rand3 == chosen_pop_idx) and max_at < at:
+                    Rand3 = self.indices2[
+                        self._random_generators.random_integers(
+                            low=0, high=self.n_inds_front - 1
+                        )
+                    ]
+                    at += 1
+                if at == max_at:
                     Rand3 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=self.n_inds_front - 1
@@ -572,9 +634,7 @@ class Algorithm:
                 # Генерация F и Cr с ограничениями
                 # Параметр мутации F
                 # Шаг 8.D.b-8.D.c
-                self.F = np.random.normal(mean_F, sigma_F)
-                while self.F < 0.0 or self.F > 1.0:
-                    self.F = np.random.normal(mean_F, sigma_F)
+                self.F = np.clip(np.random.normal(mean_F, sigma_F), 0.0, 1.0)
 
                 # Параметр кроссовера Cr из памяти
                 # Шаг 8.D.e
@@ -584,6 +644,18 @@ class Algorithm:
                 self.Cr = min(max(self.Cr, 0.0), 1.0)
                 actual_Cr = 0
                 Will_crossover = random.randint(0, self.n_vars - 1)
+
+                chosen_index_val = int(
+                    self.chosen_index
+                ) if np.isscalar(self.chosen_index) else int(self.chosen_index.item())
+                memory_index_val = int(
+                    self.memory_index
+                ) if np.isscalar(self.memory_index) else int(self.memory_index.item())
+
+                p_rand_val = int(p_rand) if np.isscalar(p_rand) else int(p_rand.item())
+                Rand1_val = int(Rand1) if np.isscalar(Rand1) else int(Rand1.item())
+                Rand2_val = int(Rand2) if np.isscalar(Rand2) else int(Rand2.item())
+                Rand3_val = int(Rand3) if np.isscalar(Rand3) else int(Rand3.item())
 
                 # Создаем массив для пробного решения
                 self.trial_solution = np.zeros(self.n_vars)
@@ -603,6 +675,16 @@ class Algorithm:
                         self.trial_solution[j] = self.front_population[self.chosen_index].reshape(-1)[j]
 
                 actual_Cr /= float(self.n_vars)
+
+                # Значения параметров
+                F_val = float(self.F) if np.isscalar(self.F) else float(self.F.item())
+                Cr_val = float(self.Cr) if np.isscalar(self.Cr) else float(self.Cr.item())
+                actual_Cr_val = float(actual_Cr) if np.isscalar(actual_Cr) else float(actual_Cr.item())
+
+                if self.verbose and i_ind in verbose_i:
+                    print(f"\t Ind {i_ind}: chosen_index={chosen_index_val}, memory_index={memory_index_val}, "
+                          f"F={F_val:.4f}, Cr={Cr_val:.4f}, actual_Cr={actual_Cr_val:.4f}, "
+                          f"p_rand={p_rand_val}, Rand1={Rand1_val}, Rand2={Rand2_val}, Rand3={Rand3_val}")
 
                 # Считаем значение целевой функции для пробного решения
                 temp_fit = self.fitness_function(self.trial_solution)
@@ -629,8 +711,21 @@ class Algorithm:
 
                 self.save_best_values()
 
+                temp_fit_val = float(temp_fit) if np.isscalar(temp_fit) else float(temp_fit.item())
+                front_val = float(self.fitness_func_values_front[self.chosen_index])
+                # Обычно элемент массива с индексом уже скаляр, но на всякий случай используем float(...)
+
+                if (self.verbose and temp_fit <= self.fitness_func_values_front[self.chosen_index]
+                        and i_ind in verbose_i):
+                    print(f"\t Success: new fitness={temp_fit_val:.4f}, "
+                          f"improvement={front_val - temp_fit_val:.4f}, "
+                          f"pf_index={self.pf_index}")
+
             # Вычисляем процент успешных мутаций
             self.success_rate = float(self.success_filled) / float(self.n_inds_front)
+
+            if self.n_inds_front < 4:
+                raise ValueError(f"Слишком мало индивидов в фронтовой популяции: {self.n_inds_front}")
 
             # Вычисляем новый размер фронтовой части популяции
             self.new_n_inds_front = int(
@@ -638,6 +733,8 @@ class Algorithm:
                 * self._global_variables.eval_func_calls
                 + self.n_inds_front_max
             )
+            self.new_n_inds_front = max(4, self.new_n_inds_front)
+
             # Удаляем худшие решения из фронтовой части популяции
             self.remove_worst(self.n_inds_front, self.new_n_inds_front)
             # Обновляем размер фронтовой части популяции
@@ -673,8 +770,10 @@ class Algorithm:
                     self.temp_population[i] = self.population[self.indices[i]].copy()
                     self.population[i] = self.temp_population[i].copy()
 
-        # Аналитика результатов после завершения оптимизации
-
-        print(f'--- Global best: {self._global_variables.global_best}')
+            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
+                print(f"End of iteration {self.iter_number}: global_best={self._global_variables.global_best}, "
+                      f"n_inds_front={self.n_inds_front}, success_rate={self.success_rate:.3f}")
+        if self.verbose:
+            print(f'--- Global best: {self._global_variables.global_best}')
 
         return None, self._global_variables.global_best
