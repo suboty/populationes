@@ -59,7 +59,7 @@ class GNBG:
             ).reshape(self.component_number, -1)
             self.optimum_position = np.array(
                 self.data['optimum_position']
-            ).reshape(self.component_number, -1)
+            )
             self.rotation_matrix = np.array(self.data['rotation_matrix'])
         except Exception as e:
             raise GnbgError(f'Error while matrix making, error: {e}')
