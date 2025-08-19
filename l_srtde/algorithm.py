@@ -350,6 +350,16 @@ class Algorithm:
                 self._global_variables.last_eval_step = step_eval_func_count
                 self._global_variables.best_of_best_array[step_eval_func_count] = self._global_variables.global_best
 
+    @staticmethod
+    def reflect(val, left, right):
+        """Отражение элемента при лимитах границ."""
+        if val < left or val > right:
+            span = right - left
+            val = left + abs((val - left) % (2 * span))
+            if val > right:
+                val = right - (val - right)
+        return val
+
     def remove_worst(self, _n_inds_front: int, new_n_inds_front: int):
         """
         Удаление худших особей из популяции
@@ -580,18 +590,17 @@ class Algorithm:
 
                 for j in range(self.n_vars):
                     if self._random_generators.random_floats() < self.Cr or Will_crossover == j:
-                        val = (self.front_population[Rand1][j]
-                               + self.F * (self.population[p_rand][j]
-                                           - self.front_population[self.chosen_index][j])
-                               + self.F * (self.front_population[Rand2][j] - self.population[Rand3][j]))
+                        val = (self.population[Rand1].reshape(-1)[j]
+                               + self.F * (self.front_population[p_rand].reshape(-1)[j]
+                                           - self.population[self.chosen_index].reshape(-1)[j])
+                               + self.F * (self.population[Rand2].reshape(-1)[j]
+                                           - self.front_population[Rand3].reshape(-1)[j]))
 
-                        if val < self.left or val > self.right:
-                            val = random.uniform(self.left, self.right)
-
+                        val = self.reflect(val, self.left, self.right)
                         self.trial_solution[j] = val
                         actual_Cr += 1
                     else:
-                        self.trial_solution[j] = self.front_population[self.chosen_index][j]
+                        self.trial_solution[j] = self.front_population[self.chosen_index].reshape(-1)[j]
 
                 actual_Cr /= float(self.n_vars)
 
