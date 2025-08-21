@@ -24,7 +24,7 @@ class AlgorithmConst:
     seed4 = global_seed + 300
 
 
-class AlgorithmGLobals:
+class AlgorithmGlobals:
     """
     Глобальные переменные для алгоритма.
 
@@ -133,7 +133,7 @@ def quick_sort_with_indices(
 
 class Algorithm:
     _consts = AlgorithmConst()
-    _global_variables = AlgorithmGLobals()
+    _global_variables = AlgorithmGlobals()
     _random_generators = AlgorithmRandomGenerators(seeds=[
         _consts.seed1,
         _consts.seed2,
@@ -143,7 +143,15 @@ class Algorithm:
 
     """Python-имплементация L-STRDE алгоритма."""
 
-    def __init__(self, fitness_function: Callable, verbose: bool = True):
+    def __init__(
+            self,
+            fitness_function: Callable,
+            problem_dimension: int,
+            population_size: int,
+            left: int = -100,
+            right: int = 100,
+            verbose: bool = True
+    ):
         self.is_last_call = False
         self.t0 = time.time()
         self.verbose = verbose
@@ -153,42 +161,42 @@ class Algorithm:
         self.fitness_function = fitness_function
 
         # Счетчики и локальные переменные
-
-        # Память для параметров ДЭ
         self.memory_size = 5
         self.memory_iter = 0
         self.memory_index = 0
-        # Количество успешных решений в итерации
         self.success_filled = 0
+
+        # Обнуление глобальных счетчиков
+        self._global_variables.eval_func_calls = 0
+        self._global_variables.last_eval_step = 0
+        self._global_variables.global_best = np.inf
+        self._global_variables.global_best_init = False
+
         # Размерность пространства решений
-        self.n_vars = 0
-        # Размер текущей популяции
-        self.n_inds_current = 0
-        # Размер фронтовой части популяции
-        self.n_inds_front = 0
-        # Максимальный размер фронтовой части популяции
-        self.n_inds_front_max = 0
-        # Новый размер фронтовой части популяции
+        # Шаг 1: Инициализация размерности пространства решений
+        self.n_vars = problem_dimension
+
+        # Размеры популяции
+        self.n_inds_current = population_size
+        self.n_inds_front = population_size
+        self.n_inds_front_max = population_size
         self.new_n_inds_front = 0
-        # Размер популяции
-        self.population_size = 0
-        # Индекс индивида, выбранного для мутации
+        self.population_size = population_size * 2
+
+        # Индексы и счетчики
         self.chosen_index = 0
-        # Номер текущего поколения
         self.iter_number = 0
-        # Индекс в фронтовой части, куда записывается новая успешная особь.
         self.pf_index = 0
+
         # Наилучшее значение целевой функции
         self.best_fitness_value = np.inf
         # Доля успешных мутаций
         self.success_rate = 0.5
         # Параметры ДЭ
-        self.F = 0.0
-        self.Cr = 0.0
-        # Верхняя граница для решения
-        self.right = 0.0
-        # Нижняя граница для решения
-        self.left = 0.0
+        self.f = 0.0
+        self.cr = 0.0
+        # Границы решения
+        self.left, self.right = left, right
 
         # Списки
         self.population = []
@@ -197,92 +205,47 @@ class Algorithm:
         self.fitness_func_values = []
         self.fitness_func_values_copy = []
         self.fitness_func_values_front = []
-        # Пробное решение (индивид)
         self.trial_solution = []
-        # Значения параметра Cr для успешных пробных особей в текущей итерации
-        self.temp_success_Cr = []
-        # Исторические значения Cr — память об успешных итерациях
-        self.Cr_memory = []
-        # Разница между старыми и новыми значениями целевой функции
+        self.temp_success_cr = []
+        self.cr_memory = []
         self.fitness_values_dif = []
-        # Используются как веса для адаптации Cr
         self.weights = []
-
-        # Индексы популяций
         self.indices = []
         self.indices2 = []
 
-    def initialize(
-            self,
-            new_n_inds: int,
-            new_n_vars: int,
-    ):
-        """Инициализация всех структур и параметров, необходимых для запуска алгоритма."""
-
-        # Шаг 1: Инициализация размерности пространства решений
-        self.n_vars = new_n_vars
-
-        # Шаг 1: Инициализация размера популяции
-        self.n_inds_current = new_n_inds
-
-        # Шаг 3: Инициализация размера популяции в фронтовой части
-        self.n_inds_front = new_n_inds
-        self.n_inds_front_max = new_n_inds
-        self.population_size = new_n_inds * 2
-        self.left = -100
-        self.right = 100
-        self.iter_number = 0
-        self.chosen_index = 0
-
-        # Шаг 3: Инициализация памяти для параметров
-        self.memory_size = 5
-        self.memory_iter = 0
-        self.success_filled = 0
-
-        # Шаг 4: Показатель успешности ставим в 50%
-        self.success_rate = 0.5
-
         # Подготовка шагов оценки
         self._global_variables.eval_steps = [
-            10000.0 / (
-                    self._consts.records_number_per_function - 1
-            ) * self.n_vars * (steps_k + 1)
+            10000.0 / (self._consts.records_number_per_function - 1) * self.n_vars * (steps_k + 1)
             for steps_k in range(self._consts.records_number_per_function - 1)
         ]
 
-        # Инициализация списков
-        # Популяция
-        self.population = np.zeros((self.population_size, self.n_vars))
+        # Инициализация массивов
+        self.population = np.random.uniform(self.left, self.right, size=(self.population_size, self.n_vars))
         self.front_population = np.zeros((self.n_inds_front, self.n_vars))
         self.temp_population = np.zeros((self.population_size, self.n_vars))
-        # Значения целевой функции
+
         self.fitness_func_values = np.zeros(self.population_size)
         self.fitness_func_values_copy = np.zeros(self.population_size)
         self.fitness_func_values_front = np.zeros(self.n_inds_front)
-        # Параметры алгоритма
+
         self.weights = np.zeros(self.population_size)
-        self.temp_success_Cr = np.zeros(self.population_size)
+        self.temp_success_cr = np.zeros(self.population_size)
         self.fitness_values_dif = np.zeros(self.population_size)
-        self.Cr_memory = np.ones(self.memory_size)
+
+        self.cr_memory = np.ones(self.memory_size)
         self.trial_solution = np.zeros(self.n_vars)
+
         self.indices = np.zeros(self.population_size, dtype=int)
         self.indices2 = np.zeros(self.population_size, dtype=int)
 
-        # Шаг 5: Генерация начальной популяции
-        self.population = np.random.uniform(
-            self.left,
-            self.right,
-            size=(self.population_size, self.n_vars)
-        )
-
-    def update_Cr_memory(self):
+    def update_cr_memory(self):
         """
-        Функция отвечает за адаптацию параметра кроссовера (Cr)
+        Функция отвечает за адаптацию параметра кроссовера (cr)
         на основе успешных значений, найденных в текущем поколении.
         """
         if self.success_filled != 0:
-            self.Cr_memory[self.memory_iter] += 0.5 * self.mean_wl(
-                self.temp_success_Cr, self.fitness_values_dif
+            self.cr_memory[self.memory_iter] += 0.5 * self.mean_wl(
+                self.temp_success_cr, self.fitness_values_dif
             )
             self.memory_iter = (self.memory_iter + 1) % self.memory_size
 
@@ -412,7 +375,13 @@ class Algorithm:
 
         return selector
 
-    def main_cycle(self):
+    @staticmethod
+    def minmax(array, limit):
+        min_value = np.min(array[:limit])
+        max_value = np.max(array[:limit])
+        return min_value, max_value
+
+    def __call__(self):
         """Запуск алгоритма L-SRTDE."""
         if self.verbose:
             print(f"Starting main cycle: max evals {self._global_variables.max_eval_func_calls}")
@@ -431,13 +400,15 @@ class Algorithm:
             self.save_best_values()
 
         # Шаг 7: Копирование значений целевых функций и индексов
-        # Определение мин/макс целевой функции
         for i in range(self.n_inds_front):
             self.fitness_func_values_copy[i] = self.fitness_func_values[i].copy()
             self.indices[i] = i
 
-        min_fitness_value = np.min(self.fitness_func_values[:self.n_inds_front])
-        max_fitness_value = np.max(self.fitness_func_values[:self.n_inds_front])
+        # Определение мин/макс целевой функции        
+        min_fitness_value, max_fitness_value = self.minmax(
+            array=self.fitness_func_values,
+            limit=self.n_inds_front
+        )
 
         # Сортировка и обновление фронтовой части популяции
         if min_fitness_value != max_fitness_value:
@@ -491,8 +462,10 @@ class Algorithm:
                 self.fitness_func_values_copy[i] = self.fitness_func_values[i]
                 self.indices[i] = i
 
-            min_fitness_value = np.min(self.fitness_func_values[:self.n_inds_front])
-            max_fitness_value = np.max(self.fitness_func_values[:self.n_inds_front])
+            min_fitness_value, max_fitness_value = self.minmax(
+                array=self.fitness_func_values,
+                limit=self.n_inds_front
+            )
 
             if min_fitness_value != max_fitness_value:
                 self.fitness_func_values_copy, self.indices = quick_sort_with_indices(
@@ -507,8 +480,10 @@ class Algorithm:
                 self.fitness_func_values_copy[i] = self.fitness_func_values_front[i]
                 self.indices2[i] = i
 
-            min_fitness_value = np.min(self.fitness_func_values_front[:self.n_inds_front])
-            max_fitness_value = np.max(self.fitness_func_values_front[:self.n_inds_front])
+            min_fitness_value, max_fitness_value = self.minmax(
+                array=self.fitness_func_values_front,
+                limit=self.n_inds_front
+            )
 
             if min_fitness_value != max_fitness_value:
                 self.fitness_func_values_copy, self.indices2 = quick_sort_with_indices(
@@ -571,79 +546,79 @@ class Algorithm:
                         )
                     ]
 
-                # Выбор Rand1, не равного p_rand
+                # Выбор rand1, не равного p_rand
                 # Шаг 8.D.g
-                Rand1 = self.indices2[
+                rand1 = self.indices2[
                     self._random_generators.random_integers(
                         low=0, high=self.n_inds_front - 1
                     )
                 ]
-                Rand1_pop = self.indices2[Rand1]
+                rand1_pop = self.indices2[rand1]
                 max_at, at = 100, 0
-                while (Rand1_pop == p_rand or Rand1_pop == chosen_pop_idx) and max_at < at:
-                    Rand1 = self.indices2[
+                while (rand1_pop == p_rand or rand1_pop == chosen_pop_idx) and max_at < at:
+                    rand1 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=self.n_inds_front - 1
                         )
                     ]
-                    Rand1_pop = self.indices2[Rand1]
+                    rand1_pop = self.indices2[rand1]
                     at += 1
                 if at == max_at:
-                    Rand1 = self.indices2[
+                    rand1 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=p_size_val - 1
                         )
                     ]
 
-                # Выбор Rand2, не равного p_rand и Rand1
+                # Выбор rand2, не равного p_rand и rand1
                 # Шаг 8.D.i.ii
-                Rand2 = self.indices2[component_selector_front()]
-                Rand2_pop = self.indices2[Rand2]
+                rand2 = self.indices2[component_selector_front()]
+                rand2_pop = self.indices2[rand2]
                 max_at, at = 100, 0
-                while (Rand2_pop == p_rand or Rand2_pop == Rand1_pop
-                       or Rand2_pop == chosen_pop_idx) and max_at < at:
-                    Rand2 = self.indices2[component_selector_front()]
-                    Rand2_pop = self.indices2[Rand2]
+                while (rand2_pop == p_rand or rand2_pop == rand1_pop
+                       or rand2_pop == chosen_pop_idx) and max_at < at:
+                    rand2 = self.indices2[component_selector_front()]
+                    rand2_pop = self.indices2[rand2]
                     at += 1
                 if max_at == at:
-                    Rand2 = self.indices2[component_selector_front()]
+                    rand2 = self.indices2[component_selector_front()]
 
-                # Выбор Rand2, не равного p_rand, Rand1 и Rand2
+                # Выбор rand2, не равного p_rand, rand1 и rand2
                 # Шаг 8.D.i.iii
-                Rand3 = self.indices2[
+                rand3 = self.indices2[
                     self._random_generators.random_integers(
                         low=0, high=self.n_inds_front - 1
                     )
                 ]
                 max_at, at = 100, 0
-                while (Rand3 == p_rand or Rand3 == Rand1_pop
-                       or Rand3 == Rand2_pop or Rand3 == chosen_pop_idx) and max_at < at:
-                    Rand3 = self.indices2[
+                while (rand3 == p_rand or rand3 == rand1_pop
+                       or rand3 == rand2_pop or rand3 == chosen_pop_idx) and max_at < at:
+                    rand3 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=self.n_inds_front - 1
                         )
                     ]
                     at += 1
                 if at == max_at:
-                    Rand3 = self.indices2[
+                    rand3 = self.indices2[
                         self._random_generators.random_integers(
                             low=0, high=self.n_inds_front - 1
                         )
                     ]
 
-                # Генерация F и Cr с ограничениями
+                # Генерация F и cr с ограничениями
                 # Параметр мутации F
                 # Шаг 8.D.b-8.D.c
-                self.F = np.clip(np.random.normal(mean_F, sigma_F), 0.0, 1.0)
+                self.f = np.clip(np.random.normal(mean_F, sigma_F), 0.0, 1.0)
 
-                # Параметр кроссовера Cr из памяти
+                # Параметр кроссовера cr из памяти
                 # Шаг 8.D.e
-                self.Cr = np.random.normal(self.Cr_memory[self.memory_index], 0.05)
-                # Ограничиваем Cr диапазоном [0, 1]
+                self.cr = np.random.normal(self.cr_memory[self.memory_index], 0.05)
+                # Ограничиваем cr диапазоном [0, 1]
                 # Шаг 8.d.f
-                self.Cr = min(max(self.Cr, 0.0), 1.0)
-                actual_Cr = 0
-                Will_crossover = random.randint(0, self.n_vars - 1)
+                self.cr = min(max(self.cr, 0.0), 1.0)
+                actual_cr = 0
+                will_crossover = random.randint(0, self.n_vars - 1)
 
                 chosen_index_val = int(
                     self.chosen_index
@@ -653,38 +628,38 @@ class Algorithm:
                 ) if np.isscalar(self.memory_index) else int(self.memory_index.item())
 
                 p_rand_val = int(p_rand) if np.isscalar(p_rand) else int(p_rand.item())
-                Rand1_val = int(Rand1) if np.isscalar(Rand1) else int(Rand1.item())
-                Rand2_val = int(Rand2) if np.isscalar(Rand2) else int(Rand2.item())
-                Rand3_val = int(Rand3) if np.isscalar(Rand3) else int(Rand3.item())
+                rand1_val = int(rand1) if np.isscalar(rand1) else int(rand1.item())
+                rand2_val = int(rand2) if np.isscalar(rand2) else int(rand2.item())
+                rand3_val = int(rand3) if np.isscalar(rand3) else int(rand3.item())
 
                 # Создаем массив для пробного решения
                 self.trial_solution = np.zeros(self.n_vars)
 
                 for j in range(self.n_vars):
-                    if self._random_generators.random_floats() < self.Cr or Will_crossover == j:
-                        val = (self.population[Rand1].reshape(-1)[j]
-                               + self.F * (self.front_population[p_rand].reshape(-1)[j]
+                    if self._random_generators.random_floats() < self.cr or will_crossover == j:
+                        val = (self.population[rand1].reshape(-1)[j]
+                               + self.f * (self.front_population[p_rand].reshape(-1)[j]
                                            - self.population[self.chosen_index].reshape(-1)[j])
-                               + self.F * (self.population[Rand2].reshape(-1)[j]
-                                           - self.front_population[Rand3].reshape(-1)[j]))
+                               + self.f * (self.population[rand2].reshape(-1)[j]
+                                           - self.front_population[rand3].reshape(-1)[j]))
 
                         val = self.reflect(val, self.left, self.right)
                         self.trial_solution[j] = val
-                        actual_Cr += 1
+                        actual_cr += 1
                     else:
                         self.trial_solution[j] = self.front_population[self.chosen_index].reshape(-1)[j]
 
-                actual_Cr /= float(self.n_vars)
+                actual_cr /= float(self.n_vars)
 
                 # Значения параметров
-                F_val = float(self.F) if np.isscalar(self.F) else float(self.F.item())
-                Cr_val = float(self.Cr) if np.isscalar(self.Cr) else float(self.Cr.item())
-                actual_Cr_val = float(actual_Cr) if np.isscalar(actual_Cr) else float(actual_Cr.item())
+                f_val = float(self.f) if np.isscalar(self.f) else float(self.f.item())
+                cr_val = float(self.cr) if np.isscalar(self.cr) else float(self.cr.item())
+                actual_cr_val = float(actual_cr) if np.isscalar(actual_cr) else float(actual_cr.item())
 
                 if self.verbose and i_ind in verbose_i:
                     print(f"\t Ind {i_ind}: chosen_index={chosen_index_val}, memory_index={memory_index_val}, "
-                          f"F={F_val:.4f}, Cr={Cr_val:.4f}, actual_Cr={actual_Cr_val:.4f}, "
-                          f"p_rand={p_rand_val}, Rand1={Rand1_val}, Rand2={Rand2_val}, Rand3={Rand3_val}")
+                          f"F={f_val:.4f}, cr={cr_val:.4f}, actual_cr={actual_cr_val:.4f}, "
+                          f"p_rand={p_rand_val}, rand1={rand1_val}, rand2={rand2_val}, rand3={rand3_val}")
 
                 # Считаем значение целевой функции для пробного решения
                 temp_fit = self.fitness_function(self.trial_solution)
@@ -699,8 +674,8 @@ class Algorithm:
                     self.fitness_func_values_front[self.pf_index] = temp_fit
                     # Обновляем лучшее решение
                     self.find_n_save_best(False, idx)
-                    # Сохраняем Cr
-                    self.temp_success_Cr[self.success_filled] = actual_Cr
+                    # Сохраняем cr
+                    self.temp_success_cr[self.success_filled] = actual_cr
                     self.fitness_values_dif[self.success_filled] = abs(
                         self.fitness_func_values_front[self.chosen_index] - temp_fit
                     )
@@ -739,8 +714,8 @@ class Algorithm:
             self.remove_worst(self.n_inds_front, self.new_n_inds_front)
             # Обновляем размер фронтовой части популяции
             self.n_inds_front = self.new_n_inds_front
-            # Обновляем память Cr
-            self.update_Cr_memory()
+            # Обновляем память cr
+            self.update_cr_memory()
             # Обновляем текущий размер популяции
             self.n_inds_current = self.n_inds_front + self.success_filled
             # Обнуляем количество успешных мутаций
