@@ -425,15 +425,20 @@ class Algorithm:
             self.fitness_func_values_front[i] = self.fitness_func_values_copy[i]
 
         self.pf_index = 0
+        epoch_num = 0
 
         # Шаг 8: Главный цикл алгоритма
         # Пока не дойдем до максимума вычислений целевой функции
         while self._global_variables.eval_func_calls < self._global_variables.max_eval_func_calls:
+            epoch_num += 1
 
             _dif_calls = self._global_variables.max_eval_func_calls - self._global_variables.eval_func_calls
             if self.verbose and _dif_calls < 50_000 and not self.is_last_call:
                 print(f'### Left {_dif_calls} calls')
                 self.is_last_call = True
+
+            if epoch_num % 1000 == 0 and epoch_num > 0:
+                print(f'\tEpoch {epoch_num} | eval calls: {self._global_variables.eval_func_calls}')
 
             _max_calls = self._global_variables.max_eval_func_calls
             _current_calls = self._global_variables.eval_func_calls

@@ -14,7 +14,7 @@ class GNBG:
     def __init__(
             self,
             func_num: int,
-            path_to_func: Path | str= Path('..', '_gnbg_functions', 'json')
+            path_to_func: Path | str= Path('_gnbg_functions', 'json')
     ):
         # basic parameters
         self.max_evals = None

@@ -1,5 +1,6 @@
 # PyCharm service folder
 .idea
+.vscode
 *__pycache__
 
 # Python virtual environment
@@ -15,6 +16,7 @@
 *.csv
 *tmp*
 *.pdf
+*notebooks/
 
 # files of GNBG functions
 *.mat
