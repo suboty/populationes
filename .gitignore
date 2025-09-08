@@ -16,7 +16,7 @@
 *.csv
 *tmp*
 *.pdf
-*notebooks/
+*notebooks
 
 # files of GNBG functions
 *.mat
