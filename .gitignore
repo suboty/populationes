@@ -17,6 +17,8 @@
 *tmp*
 *.pdf
 *notebooks
+*.png
+results/
 
 # files of GNBG functions
 *.mat

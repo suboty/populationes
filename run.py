@@ -1,13 +1,17 @@
+import os
 import time
 import traceback
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from l_srtde.algorithm import Algorithm
-from _gnbg_functions.gnbg_for_json import GNBG
+from _gnbg_functions.gnbg_for_txt2 import GNBG
+
 
 if __name__ == '__main__':
+    os.makedirs('./results', exist_ok=True)
     # Основные настройки
 
     # Количество прогонов для каждой функции
@@ -37,7 +41,7 @@ if __name__ == '__main__':
         try:
             gnbg = GNBG(func_num + 1)
             fopt = gnbg.optimum_value
-            print(f'Real optimum: {fopt}')
+            print(f'\tReal optimum: {fopt}')
             fopts[func_num] = fopt
 
             _optimums = np.zeros(total_n_runs)
@@ -50,7 +54,7 @@ if __name__ == '__main__':
                     fitness_function=gnbg.fitness,
                     population_size=population_size * gnbg.dimension,
                     problem_dimension=gnbg.dimension,
-                    verbose=False
+                    verbose=True
                 )
 
                 # Настраиваем максимальное количество вызовов целевой функции
@@ -59,12 +63,16 @@ if __name__ == '__main__':
 
                 # Читаем результаты работы
                 _optimums[run] = optimum
-                res_errors[func_num, run] = optz._global_variables.error_array
                 res[func_num, run] = optz._global_variables.best_of_best_array
                 sr_res[func_num, run] = optz._global_variables.sr_array
 
                 print(f'\tFinded optimum: {optimum}')
             optimums[func_num] = np.mean(_optimums)
+
+            # Сохраняем результаты работы
+            np.savetxt(Path('results', f'{func_num}_results'), res[func_num], fmt='%.4f')
+            np.savetxt(Path('results', f'{func_num}_sr'), sr_res[func_num], fmt='%.4f')
+
         except Exception as e:
             print(f'\t### Error in function {func_num}: {e}')
             print(f'\t### Traceback: {traceback.format_exc()}')
@@ -72,7 +80,7 @@ if __name__ == '__main__':
     print(f'Elapsed time: {round(time.time() - t0, 2)} sec')
 
     is_need_log = False
-    is_need_saving = False
+    is_need_saving = True
 
     fig = plt.figure(figsize=(24, 18), constrained_layout=True)
     gs = fig.add_gridspec(4, 4)
@@ -106,5 +114,5 @@ if __name__ == '__main__':
         ax.legend(fontsize='large')
 
     if is_need_saving:
-        plt.savefig('python_l_strde_on_gnbg.png')
+        plt.savefig(Path('l_srtde', 'python_l_srtde_on_gnbg.png'))
     plt.show()
