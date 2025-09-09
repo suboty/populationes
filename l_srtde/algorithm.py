@@ -590,6 +590,8 @@ class Algorithm:
                 self.cr = np.random.normal(self.cr_memory[self.memory_index], 0.05)
                 # Ограничиваем cr диапазоном [0, 1]
                 self.cr = min(max(self.cr, 0.0), 1.0)
+                if type(self.cr) == np.ndarray:
+                    self.cr = self.cr[0]
                 actual_cr = 0
                 will_crossover = random.randint(0, self.n_vars - 1)
 
