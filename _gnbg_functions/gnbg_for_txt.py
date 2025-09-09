@@ -12,7 +12,7 @@ class GNBG:
         self.omega = None
         self.mu = None
         self.opt_position = None
-        self.opt_value = None
+        self.optimum_value = None
         self.verbose = verbose
         self.rotation_matrix = None
         self.comp_min_pos = None
@@ -23,7 +23,7 @@ class GNBG:
         self.acceptance_threshold = None
         self.max_evals = None
         self.func_num = func_num
-        self.path_to_func = Path('..', '_gnbg_functions', 'txt')
+        self.path_to_func = Path('_gnbg_functions', 'txt')
         self.load_parameters()
         self.prepare_components()
 
@@ -69,10 +69,10 @@ class GNBG:
             and not lines[opt_value_line].replace('.', '', 1).replace('-', '',1).strip().isdigit():
                 opt_value_line += 1
         try:
-            self.opt_value = float(lines[opt_value_line])
+            self.optimum_value = float(lines[opt_value_line])
         except IndexError:
             opt_value_line = len(lines) - 2
-            self.opt_value = float(lines[opt_value_line])
+            self.optimum_value = float(lines[opt_value_line])
         self.opt_position = np.array(
             [float(x) for x in lines[opt_value_line + 1].split()[:self.dimension]]
         )
@@ -84,11 +84,12 @@ class GNBG:
     def prepare_components(self):
         self.sigma_matrices = [np.eye(self.dimension)]
 
-    def Fitness(self, x: np.ndarray) -> float:
+    def fitness(self, x: np.ndarray) -> float:
         z = x - self.opt_position
         if hasattr(self, 'rotation_matrix') and self.rotation_matrix.shape == (self.dimension, self.dimension):
             z = self.rotation_matrix @ z
-        return np.sum(z ** 2)
+        ans = np.sum(z ** 2)
+        return ans
 
     def __str__(self):
         return f"GNBG Function {self.func_num} (D={self.dimension})"
