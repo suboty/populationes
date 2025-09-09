@@ -242,51 +242,34 @@ class Algorithm:
         на основе успешных значений, найденных в текущем поколении.
         """
         if self.success_filled != 0:
-            self.cr_memory[self.memory_iter] += 0.5 * self.mean_wl(
+            new_cr = 0.5 * ( self.mean_wl(
                 self.temp_success_cr, self.fitness_values_dif
-            )
+            ) + self.cr_memory[self.memory_iter])
+            self.cr_memory[self.memory_iter] = new_cr
             self.memory_iter = (self.memory_iter + 1) % self.memory_size
 
+    @staticmethod
     def mean_wl(
-            self,
             array: Union[npt.NDArray[np.float64], List[float]],
             temp_weights: Union[npt.NDArray[np.float64], List[float]],
-            is_need_cleaning: bool = False
     ) -> float:
         """
         Функция возвращает адаптивное значение параметра,
         основанное на успешных значениях из предыдущего поколения,
         с учетом того, насколько они улучшили результат.
         """
-        sum_weight = 0
-        sum_square = 0
-        _sum = 0
-        weights = np.empty(self.success_filled)
+        sum_weight = np.sum(temp_weights)
+        if sum_weight == 0:
+            return 1.0
 
-        for i in range(self.success_filled):
-            sum_weight += temp_weights[i]
+        weights = temp_weights / sum_weight
+        sum_square = np.sum(weights * array * array)
+        sum_val = np.sum(weights * array)
 
-        for i in range(self.success_filled):
-            if sum_weight == 0 or np.isnan(sum_weight):
-                weights[i] = 0
-            else:
-                weights[i] = temp_weights[i] / sum_weight
-
-        for i in range(self.success_filled):
-            sum_square += weights[i] * np.power(array[i], 2)
-            _sum += weights[i] * array[i]
-
-        if abs(_sum) > 1e-8:
-            result = sum_square / _sum
+        if abs(sum_val) > 1e-8:
+            return sum_square/sum_val
         else:
-            result = 1.0
-
-        if is_need_cleaning:
-            array[:self.success_filled] = 0.0
-            temp_weights[:self.success_filled] = 0.0
-            self.success_filled = 0
-
-        return result
+            return 1.0
 
     def find_n_save_best(self, init, ind_iter):
         """
