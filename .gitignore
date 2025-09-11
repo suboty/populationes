@@ -12,16 +12,25 @@
 
 # research
 *.ipynb_checkpoints
+*tmp*
+*notebooks
+
+# other files
+*.png
+*.pdf
 *.xlsx
 *.csv
-*tmp*
-*.pdf
-*notebooks
-*.png
-results/
+*.aux
+*.log
+*.tex
+
+# results
+Results/
+Results_Python_implementation/
 
 # files of GNBG functions
 *.mat
+*.json
 
 # other
 *.DS_Store

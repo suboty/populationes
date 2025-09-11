@@ -3,7 +3,11 @@ from pathlib import Path
 from typing import Union
 
 class GNBG:
-    def __init__(self, func_num: int, directory: Union[str, Path] = Path('_gnbg_functions', 'txt')):
+    def __init__(
+            self,
+            func_num: int,
+            directory: Union[str, Path] = Path('_gnbg_functions', 'txt')
+    ):
         # Читаем весь файл как список чисел
         self.func_num = func_num
         path = Path(directory) / f"f{func_num}.txt"
@@ -117,9 +121,8 @@ class GNBG:
             if (self.fe_history[self.fe_eval] - self.optimum_value < self.acceptance_threshold
                 and self.acceptance_reach_point == -1):
                 self.acceptance_reach_point = float(self.fe_eval)
-        except:
-            print(len(self.fe_history))
-            print(self.fe_eval)
+        except Exception as e:
+            raise e
 
         self.fe_eval += 1
         return float(res)
