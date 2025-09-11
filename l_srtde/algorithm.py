@@ -14,14 +14,12 @@ class AlgorithmConst:
         records_number_per_function:
             количество точек данных, сохраненных в массиве результатов, для построения кривой сходимости.
         global_seed: глобальный seed для всех генераторов.
-        seed1,...,seed4: seed-ы для генераторов.
+        seed1, seed2: seed-ы для генераторов.
     """
     records_number_per_function = 1001
     global_seed = 2025
     seed1 = global_seed
     seed2 = global_seed + 100
-    seed3 = global_seed + 200
-    seed4 = global_seed + 300
 
 
 class AlgorithmGlobals:
@@ -32,8 +30,7 @@ class AlgorithmGlobals:
         eval_steps:
             массив контрольных значений оценки,
             в котором будет храниться ошибка оптимизации.
-        error_array: хранит значения отклонения от оптимума (ошибки).
-        best_of_best_array: хранит значения оптимума.
+        result_array: хранит значения оптимума.
         sr_array: хранит значения истории успешности.
         last_eval_step: счетчик для хранения последнего шага оценки.
         eval_func_calls: счетчик для хранения количества текущих вызовов целевой функции.
@@ -44,13 +41,10 @@ class AlgorithmGlobals:
         global_best_init: булев флаг для инициализации global_best.
     """
     eval_steps = np.zeros(AlgorithmConst.records_number_per_function - 1)
-    error_array = np.zeros(AlgorithmConst.records_number_per_function)
-    best_of_best_array = np.zeros(AlgorithmConst.records_number_per_function)
+    result_array = np.zeros(AlgorithmConst.records_number_per_function)
     sr_array = np.zeros(AlgorithmConst.records_number_per_function)
     last_eval_step = 0
     eval_func_calls = 0
-
-    # Инициализация максимального количество вызовов целевой функции
     max_eval_func_calls = 0
     problem_dimension = 30
     eval_func_opt_value = 0.0
@@ -59,11 +53,11 @@ class AlgorithmGlobals:
 
 
 class AlgorithmRandomGenerators:
-    """Класс, реализующий генераторы."""
+    """Класс, реализующий генераторы случайных чисел."""
 
     def __init__(self, seeds: List[int]):
         self.generators = []
-        if len(seeds) < 4:
+        if len(seeds) < 2:
             raise ValueError
         for i, seed in enumerate(seeds):
             self.generators.append(np.random.default_rng(seed=seed))
@@ -75,22 +69,6 @@ class AlgorithmRandomGenerators:
     def random_floats(self):
         """Возвращает число с плавающей запятой в интервале от 0 до 1."""
         return self.generators[1].random(size=1)[0]
-
-    def random_normal(self, size: int = 1):
-        """Возращает случайное число с плавающей запятой в нормальном распределении."""
-        return self.generators[2].normal(size=size)
-
-    def alt_random_integers(self, low: int, high: int, size: int):
-        """Возвращает случайное целое число в указанном интервале. Ещё один."""
-        return self.generators[3].integers(low=low, high=high, size=size)
-
-
-random_generator = AlgorithmRandomGenerators(seeds=[
-    AlgorithmConst.seed1,
-    AlgorithmConst.seed2,
-    AlgorithmConst.seed3,
-    AlgorithmConst.seed4
-])
 
 
 def quick_sort_with_indices(
@@ -132,13 +110,11 @@ def quick_sort_with_indices(
 
 
 class Algorithm:
-    _consts = AlgorithmConst()
-    _global_variables = AlgorithmGlobals()
+    consts = AlgorithmConst()
+    global_variables = AlgorithmGlobals()
     _random_generators = AlgorithmRandomGenerators(seeds=[
-        _consts.seed1,
-        _consts.seed2,
-        _consts.seed3,
-        _consts.seed4
+        consts.seed1,
+        consts.seed2,
     ])
 
     """Python-имплементация L-STRDE алгоритма."""
@@ -166,10 +142,10 @@ class Algorithm:
         self.success_filled = 0
 
         # Обнуление глобальных счетчиков
-        self._global_variables.eval_func_calls = 0
-        self._global_variables.last_eval_step = 0
-        self._global_variables.global_best = np.inf
-        self._global_variables.global_best_init = False
+        self.global_variables.eval_func_calls = 0
+        self.global_variables.last_eval_step = 0
+        self.global_variables.global_best = np.inf
+        self.global_variables.global_best_init = False
 
         # Размерность пространства решений
         self.n_vars = problem_dimension
@@ -212,9 +188,9 @@ class Algorithm:
         self.indices2 = []
 
         # Подготовка шагов оценки
-        self._global_variables.eval_steps = [
-            10000.0 / (self._consts.records_number_per_function - 1) * self.n_vars * (steps_k + 1)
-            for steps_k in range(self._consts.records_number_per_function - 1)
+        self.global_variables.eval_steps = [
+            10000.0 / (self.consts.records_number_per_function - 1) * self.n_vars * (steps_k + 1)
+            for steps_k in range(self.consts.records_number_per_function - 1)
         ]
 
         # Инициализация массивов
@@ -267,7 +243,7 @@ class Algorithm:
         sum_val = np.sum(weights * array)
 
         if abs(sum_val) > 1e-8:
-            return sum_square/sum_val
+            return np.divide(sum_square, sum_val)
         else:
             return 1.0
 
@@ -278,40 +254,36 @@ class Algorithm:
         """
         if self.fitness_func_values[ind_iter] <= self.best_fitness_value or init:
             self.best_fitness_value = self.fitness_func_values[ind_iter]
-        if self.best_fitness_value < self._global_variables.global_best or init:
-            self._global_variables.global_best = self.best_fitness_value
+        if self.best_fitness_value < self.global_variables.global_best or init:
+            self.global_variables.global_best = self.best_fitness_value
 
     def save_best_values(self):
         """
         Функция предназначена для сохранения сходимости
         траектории алгоритма оптимизации.
         """
-        temp = self._global_variables.global_best - self._global_variables.eval_func_opt_value
-        if temp <= 1e-8 \
-                and self._global_variables.error_array[
-            self._consts.records_number_per_function - 1
-        ] == self._global_variables.max_eval_func_calls:
-            self._global_variables.error_array[
-                self._consts.records_number_per_function - 1
-                ] = self._global_variables.eval_func_calls
+        temp = self.global_variables.global_best - self.global_variables.eval_func_opt_value
+        if temp <= 1e-8 and self.global_variables.result_array[
+            self.consts.records_number_per_function - 1
+        ] == self.global_variables.max_eval_func_calls:
+            self.global_variables.result_array[
+                self.consts.records_number_per_function - 1
+                ] = self.global_variables.eval_func_calls
 
         for step_eval_func_count in range(
-                self._global_variables.last_eval_step,
-                self._consts.records_number_per_function - 1):
-            if self._global_variables.eval_func_calls == self._global_variables.eval_steps[
+                self.global_variables.last_eval_step,
+                self.consts.records_number_per_function - 1):
+            if self.global_variables.eval_func_calls == self.global_variables.eval_steps[
                 step_eval_func_count
             ]:
                 if temp <= 1e-8:
                     temp = 0
 
                 # Обновление результирующих массивов
-                self._global_variables.error_array[step_eval_func_count] = temp
-                self._global_variables.best_of_best_array[
-                    step_eval_func_count
-                ] = self._global_variables.global_best
-                self._global_variables.sr_array[step_eval_func_count] = self.success_rate
+                self.global_variables.result_array[step_eval_func_count] = temp
+                self.global_variables.sr_array[step_eval_func_count] = self.success_rate
 
-                self._global_variables.last_eval_step = step_eval_func_count
+                self.global_variables.last_eval_step = step_eval_func_count
 
     @staticmethod
     def reflect(val, left, right):
@@ -366,18 +338,18 @@ class Algorithm:
     def __call__(self):
         """Запуск алгоритма L-SRTDE."""
         if self.verbose:
-            print(f"Starting main cycle: max evals {self._global_variables.max_eval_func_calls}")
+            print(f"Starting main cycle: max evals {self.global_variables.max_eval_func_calls}")
 
         # Инициализация значений целевой функции для стартовой популяции
         for i_inds in range(self.n_inds_front):
             self.fitness_func_values[i_inds] = self.fitness_function(self.population[i_inds])
-            self._global_variables.eval_func_calls += 1
+            self.global_variables.eval_func_calls += 1
             self.find_n_save_best(i_inds == 0, i_inds)
 
-            if (not self._global_variables.global_best_init
-                    or self.best_fitness_value < self._global_variables.global_best):
-                self._global_variables.global_best = self.best_fitness_value
-                self._global_variables.global_best_init = True
+            if (not self.global_variables.global_best_init
+                    or self.best_fitness_value < self.global_variables.global_best):
+                self.global_variables.global_best = self.best_fitness_value
+                self.global_variables.global_best_init = True
 
             self.save_best_values()
 
@@ -411,30 +383,25 @@ class Algorithm:
 
         # Главный цикл алгоритма
         # Пока не дойдем до максимума вычислений целевой функции
-        while self._global_variables.eval_func_calls < self._global_variables.max_eval_func_calls:
+        while self.global_variables.eval_func_calls < self.global_variables.max_eval_func_calls:
             epoch_num += 1
 
-            _dif_calls = self._global_variables.max_eval_func_calls - self._global_variables.eval_func_calls
+            _dif_calls = self.global_variables.max_eval_func_calls - self.global_variables.eval_func_calls
             if self.verbose and _dif_calls < 50_000 and not self.is_last_call:
                 print(f'### Left {_dif_calls} calls')
                 self.is_last_call = True
 
-            _max_calls = self._global_variables.max_eval_func_calls
-            _current_calls = self._global_variables.eval_func_calls
+            _max_calls = self.global_variables.max_eval_func_calls
+            _current_calls = self.global_variables.eval_func_calls
 
-            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
+            if self.verbose and self.iter_number % (self.global_variables.max_eval_func_calls // 1_000) == 0:
                 print(
                     f'--- Iteration {self.iter_number}, '
                     f'left {_max_calls-_current_calls} calls, '
-                    f'current best fitness value: {self._global_variables.global_best}, '
+                    f'current best fitness value: {self.global_variables.global_best}, '
                     f'elapsed: {round(time.time()-self.t0, 2)} seconds'
                 )
                 self.t0 = time.time()
-
-            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
-                print(f"\t Iteration {self.iter_number}: evals={self._global_variables.eval_func_calls}, "
-                      f"current best={self._global_variables.global_best}, "
-                      f"success_rate={self.success_rate:.3f}, n_inds_front={self.n_inds_front}")
 
             # Расчет параметров
             mean_F = 0.4 + np.tanh(self.success_rate * 5) * 0.25
@@ -595,18 +562,6 @@ class Algorithm:
                 actual_cr = 0
                 will_crossover = random.randint(0, self.n_vars - 1)
 
-                chosen_index_val = int(
-                    self.chosen_index
-                ) if np.isscalar(self.chosen_index) else int(self.chosen_index.item())
-                memory_index_val = int(
-                    self.memory_index
-                ) if np.isscalar(self.memory_index) else int(self.memory_index.item())
-
-                p_rand_val = int(p_rand) if np.isscalar(p_rand) else int(p_rand.item())
-                rand1_val = int(rand1) if np.isscalar(rand1) else int(rand1.item())
-                rand2_val = int(rand2) if np.isscalar(rand2) else int(rand2.item())
-                rand3_val = int(rand3) if np.isscalar(rand3) else int(rand3.item())
-
                 # Создаем массив для пробного решения
                 self.trial_solution = np.zeros(self.n_vars)
 
@@ -626,19 +581,9 @@ class Algorithm:
 
                 actual_cr /= float(self.n_vars)
 
-                # Значения параметров
-                f_val = float(self.f) if np.isscalar(self.f) else float(self.f.item())
-                cr_val = float(self.cr) if np.isscalar(self.cr) else float(self.cr.item())
-                actual_cr_val = float(actual_cr) if np.isscalar(actual_cr) else float(actual_cr.item())
-
-                if self.verbose and i_ind in verbose_i:
-                    print(f"\t Ind {i_ind}: chosen_index={chosen_index_val}, memory_index={memory_index_val}, "
-                          f"F={f_val:.4f}, cr={cr_val:.4f}, actual_cr={actual_cr_val:.4f}, "
-                          f"p_rand={p_rand_val}, rand1={rand1_val}, rand2={rand2_val}, rand3={rand3_val}")
-
                 # Считаем значение целевой функции для пробного решения
                 temp_fit = self.fitness_function(self.trial_solution)
-                self._global_variables.eval_func_calls += 1
+                self.global_variables.eval_func_calls += 1
 
                 if temp_fit <= self.fitness_func_values_front[self.chosen_index]:
                     # Если улучшение найдено
@@ -663,7 +608,6 @@ class Algorithm:
 
                 temp_fit_val = float(temp_fit) if np.isscalar(temp_fit) else float(temp_fit.item())
                 front_val = float(self.fitness_func_values_front[self.chosen_index])
-                # Обычно элемент массива с индексом уже скаляр, но на всякий случай используем float(...)
 
                 if (self.verbose and temp_fit <= self.fitness_func_values_front[self.chosen_index]
                         and i_ind in verbose_i):
@@ -679,8 +623,8 @@ class Algorithm:
 
             # Вычисляем новый размер фронтовой части популяции
             self.new_n_inds_front = int(
-                (4 - self.n_inds_front_max) / self._global_variables.max_eval_func_calls
-                * self._global_variables.eval_func_calls
+                (4 - self.n_inds_front_max) / self.global_variables.max_eval_func_calls
+                * self.global_variables.eval_func_calls
                 + self.n_inds_front_max
             )
             self.new_n_inds_front = max(4, self.new_n_inds_front)
@@ -693,9 +637,9 @@ class Algorithm:
             self.update_cr_memory()
             # Обновляем текущий размер популяции
             self.n_inds_current = self.n_inds_front + self.success_filled
-            if epoch_num % 1000 == 0 and epoch_num > 0:
-                print(f'\tEpoch {epoch_num} | eval calls: {self._global_variables.eval_func_calls} '
-                      f'| Current Optimum: {round(self._global_variables.global_best,3)} '
+            if epoch_num % 1000 == 0 and epoch_num > 0 and self.verbose:
+                print(f'\tEpoch {epoch_num} | eval calls: {self.global_variables.eval_func_calls} '
+                      f'| Current Optimum: {round(self.global_variables.global_best,3)} '
                       f'| F: {round(mean_F,2)} | Cr: {round(self.cr,2)} | Front size: {self.n_inds_front} '
                       f'| SR: {round(self.success_rate,3)} | SF: {self.success_filled}')
             # Обнуляем количество успешных мутаций
@@ -725,11 +669,11 @@ class Algorithm:
                     self.temp_population[i] = self.population[self.indices[i]].copy()
                     self.population[i] = self.temp_population[i].copy()
 
-            if self.verbose and self.iter_number % (self._global_variables.max_eval_func_calls // 1_000) == 0:
-                print(f"End of iteration {self.iter_number}: global_best={self._global_variables.global_best}, "
+            if self.verbose and self.iter_number % (self.global_variables.max_eval_func_calls // 1_000) == 0:
+                print(f"End of iteration {self.iter_number}: global_best={self.global_variables.global_best}, "
                       f"n_inds_front={self.n_inds_front}, success_rate={self.success_rate:.3f}")
 
         if self.verbose:
-            print(f'--- Global best: {self._global_variables.global_best}')
+            print(f'--- Global best: {self.global_variables.global_best}')
 
-        return None, self._global_variables.global_best
+        return None, self.global_variables.global_best
