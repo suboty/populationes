@@ -6,6 +6,8 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 from l_srtde.algorithm import Algorithm
 from _gnbg_functions.gnbg import GNBG
@@ -63,6 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--runNum', type=int, default=31)
     parser.add_argument('--funcNum', type=int, default=24)
     parser.add_argument('--populationSize', type=int, default=10)
+    parser.add_argument('--displayEpochLimit', type=int, default=1000)
     args = parser.parse_args()
 
     os.makedirs(Path('l_srtde', 'Results_Python_implementation'), exist_ok=True)
@@ -70,6 +73,7 @@ if __name__ == '__main__':
     total_n_runs = args.runNum
     max_n_funcs = args.funcNum
     population_size = args.populationSize
+    limit = args.displayEpochLimit
 
     res = np.zeros((max_n_funcs, total_n_runs, 1001))
     sr_res = np.zeros((max_n_funcs, total_n_runs, 1001))
@@ -79,10 +83,8 @@ if __name__ == '__main__':
     t0 = time.time()
     with ProcessPoolExecutor() as executor:
         futures = [
-            executor.submit(
-                run_algorithm_for_func,
-                func_num, total_n_runs, population_size
-            ) for func_num in range(max_n_funcs)
+            executor.submit(run_algorithm_for_func, func_num, total_n_runs, population_size)
+            for func_num in range(max_n_funcs)
         ]
         for future in as_completed(futures):
             result = future.result()
@@ -99,3 +101,39 @@ if __name__ == '__main__':
                 ), res[func_num], fmt='%.1f')
 
     print(f'Elapsed time: {round(time.time() - t0, 2)} sec')
+
+    is_need_saving = True
+    is_need_log = True
+
+    fig = plt.figure(figsize=(24, 18), constrained_layout=True)
+    gs = fig.add_gridspec(6, 4)
+
+    for func_num in range(max_n_funcs):
+        row = func_num // 4
+        col = func_num % 4
+        ax = fig.add_subplot(gs[row, col])
+        optimum = float(optimums[func_num])
+
+        cmap = cm.get_cmap('tab20', total_n_runs)
+
+        for run in range(total_n_runs):
+            data = res[func_num, run, :limit]
+            data = np.where(data > 0.0, data, np.nan)
+            color = cmap(run % 20)
+            if is_need_log:
+                ax.semilogy(data, color=color, label=f"Run {run + 1}: {round(optimum, 6)}")
+            else:
+                ax.plot(data, color=color, label=f"Run {run + 1}: {round(optimum, 6)}")
+
+        ax.set_title(f"F{func_num + 1}", fontsize=16)
+        ax.set_xlabel("Function Evaluations")
+        ax.set_ylabel("Best Fitness (log scale)")
+
+        ax.axhline(y=0, color='red', linestyle='--', label='y=0')
+
+        ax.grid(True, which="both", linestyle='--', linewidth=0.5)
+        ax.legend(fontsize='small', ncol=2)
+
+    plt.tight_layout()
+    if is_need_saving:
+        plt.savefig(Path('l_srtde', 'python_l_srtde_on_gnbg.png'))
