@@ -129,8 +129,6 @@ if __name__ == '__main__':
         ax.set_xlabel("Function Evaluations")
         ax.set_ylabel("Best Fitness (log scale)")
 
-        ax.axhline(y=0, color='red', linestyle='--', label='y=0')
-
         ax.grid(True, which="both", linestyle='--', linewidth=0.5)
         ax.legend(fontsize='small', ncol=2)
 
