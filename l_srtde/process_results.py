@@ -1,5 +1,6 @@
 import subprocess
 import argparse
+from io import StringIO
 from pathlib import Path
 
 import numpy as np
@@ -19,9 +20,9 @@ def latex_to_pdf_subprocess(latex_file, output_dir="."):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='populationes-runs-results')
     parser.add_argument('--originalFuncNum', type=int, default=24)
-    parser.add_argument('--originalRunNum', type=int, default=30)
+    parser.add_argument('--originalRunNum', type=int, default=31)
     parser.add_argument('--implementationFuncNum', type=int, default=24)
-    parser.add_argument('--implementationRunNum', type=int, default=30)
+    parser.add_argument('--implementationRunNum', type=int, default=31)
     args = parser.parse_args()
 
     path_to_python_implementation_results = "Results_Python_implementation"
@@ -32,13 +33,14 @@ if __name__ == '__main__':
         (path_to_original_results, 'original_')
     ]:
         n_func = args.originalFuncNum if prefix == 'original_' else args.implementationFuncNum
-        n_runs = args.originalRunNum if prefix == 'original_' else args.implementationRunNum
+        n_runs = args.originalRunNum + 1 if prefix == 'original_' else args.implementationRunNum
         all_res = np.zeros((n_func, n_runs, 1001))
 
         for func in range(n_func):
-            all_res[func] = np.loadtxt(
-                Path(path, f"L-SRTDE_GNBG_F{func+1}_D30.txt")
-            )
+            with open(Path(path, f"L-SRTDE_GNBG_F{func+1}_D30.txt"), 'r') as f:
+                all_res[func] = np.loadtxt(
+                    StringIO(f.readline().rstrip()),
+                )
 
         str1 = "Func & Absolute error & Required FEs to Acceptance Threshold & Success rate \\\\\n\\hline\n"
         for func in range(n_func):

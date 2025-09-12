@@ -47,7 +47,7 @@ class AlgorithmGlobals:
     eval_func_calls = 0
     max_eval_func_calls = 0
     problem_dimension = 30
-    eval_func_opt_value = 0.0
+    eval_func_opt_value = None
     global_best = np.inf
     global_best_init = False
 
@@ -116,6 +116,8 @@ class Algorithm:
         consts.seed1,
         consts.seed2,
     ])
+
+    threshold = 1e-6
 
     """Python-имплементация L-STRDE алгоритма."""
 
@@ -224,8 +226,8 @@ class Algorithm:
             self.cr_memory[self.memory_iter] = new_cr
             self.memory_iter = (self.memory_iter + 1) % self.memory_size
 
-    @staticmethod
     def mean_wl(
+            self,
             array: Union[npt.NDArray[np.float64], List[float]],
             temp_weights: Union[npt.NDArray[np.float64], List[float]],
     ) -> float:
@@ -242,7 +244,7 @@ class Algorithm:
         sum_square = np.sum(weights * array * array)
         sum_val = np.sum(weights * array)
 
-        if abs(sum_val) > 1e-8:
+        if abs(sum_val) > self.threshold:
             return np.divide(sum_square, sum_val)
         else:
             return 1.0
@@ -263,7 +265,7 @@ class Algorithm:
         траектории алгоритма оптимизации.
         """
         temp = self.global_variables.global_best - self.global_variables.eval_func_opt_value
-        if temp <= 1e-8 and self.global_variables.result_array[
+        if temp <= self.threshold and self.global_variables.result_array[
             self.consts.records_number_per_function - 1
         ] == self.global_variables.max_eval_func_calls:
             self.global_variables.result_array[
@@ -272,11 +274,12 @@ class Algorithm:
 
         for step_eval_func_count in range(
                 self.global_variables.last_eval_step,
-                self.consts.records_number_per_function - 1):
+                self.consts.records_number_per_function - 1
+        ):
             if self.global_variables.eval_func_calls == self.global_variables.eval_steps[
                 step_eval_func_count
             ]:
-                if temp <= 1e-8:
+                if temp <= self.threshold:
                     temp = 0
 
                 # Обновление результирующих массивов
