@@ -121,9 +121,9 @@ if __name__ == '__main__':
             data = np.where(data > 0.0, data, np.nan)
             color = cmap(run % 20)
             if is_need_log:
-                ax.semilogy(data, color=color, label=f"Run {run + 1}: {round(optimum, 6)}")
+                ax.semilogy(data, color=color)
             else:
-                ax.plot(data, color=color, label=f"Run {run + 1}: {round(optimum, 6)}")
+                ax.plot(data, color=color)
 
         ax.set_title(f"F{func_num + 1}", fontsize=16)
         ax.set_xlabel("Function Evaluations")
