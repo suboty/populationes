@@ -1,4 +1,4 @@
-# GNBG functions
+# GNBG 2024
 
 See original paper <a href="https://arxiv.org/pdf/2312.07083">here</a>.
 
@@ -6,7 +6,7 @@ See original paper <a href="https://arxiv.org/pdf/2312.07083">here</a>.
 
 This benchmark can be used for single-objective, box-constrained, continuous numerical optimization.
 
-## For viewing
+## For viewing matlab files
 Use <a href="https://octave.org/download">Octave GUI</a> for viewing original *.mat* files.
 
 Command for Octave GUI running:

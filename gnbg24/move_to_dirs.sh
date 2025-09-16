@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/bash
+#!/bin/bash
 
 ls mat || { echo "<mat> folder is not found!"; exit; }
 for filename in *.mat; do
@@ -8,9 +8,4 @@ done
 ls txt || { echo "<txt> folder is not found!"; exit; }
 for filename in *.txt; do
   mv "./$filename" "./txt/$filename"
-done
-
-ls json || { echo "<json> folder is not found!"; exit; }
-for filename in *.json; do
-  mv "./$filename" "./json/$filename"
 done

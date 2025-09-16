@@ -6,7 +6,7 @@ class GNBG:
     def __init__(
             self,
             func_num: int,
-            directory: Union[str, Path] = Path('_gnbg_functions', 'txt')
+            directory: Union[str, Path] = Path('gnbg24', 'txt')
     ):
         # Читаем весь файл как список чисел
         self.func_num = func_num
