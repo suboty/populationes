@@ -7,7 +7,10 @@ import numpy as np
 
 def latex_to_pdf_subprocess(latex_file, output_dir="."):
     try:
-        subprocess.run(["pdflatex", "-output-directory", output_dir, latex_file], check=True)
+        subprocess.run(
+            ["pdflatex", "-interaction=batchmode", "-output-directory", output_dir, latex_file],
+            check=True
+        )
         print(f"Successfully converted {latex_file} to PDF in {output_dir}.")
     except subprocess.CalledProcessError as e:
         print(f"Error during LaTeX compilation: {e}")

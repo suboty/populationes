@@ -38,7 +38,6 @@ class AlgorithmGlobals:
         problem_dimension: размерность задачи.
         eval_func_opt_value: оптимальное значение целевой функции.
         global_best: наилучшее значение целевой функции, найденное глобально (в текущей итерации).
-        global_best_init: булев флаг для инициализации global_best.
     """
     eval_steps = np.zeros(AlgorithmConst.records_number_per_function - 1)
     result_array = np.zeros(AlgorithmConst.records_number_per_function)
@@ -49,7 +48,6 @@ class AlgorithmGlobals:
     problem_dimension = 30
     eval_func_opt_value = None
     global_best = np.inf
-    global_best_init = False
 
 
 class AlgorithmRandomGenerators:
@@ -117,7 +115,7 @@ class Algorithm:
         consts.seed2,
     ])
 
-    threshold = 1e-6
+    threshold = 1e-8
 
     """Python-имплементация L-STRDE алгоритма."""
 
@@ -147,7 +145,6 @@ class Algorithm:
         self.global_variables.eval_func_calls = 0
         self.global_variables.last_eval_step = 0
         self.global_variables.global_best = np.inf
-        self.global_variables.global_best_init = False
 
         # Размерность пространства решений
         self.n_vars = problem_dimension
@@ -236,13 +233,12 @@ class Algorithm:
         основанное на успешных значениях из предыдущего поколения,
         с учетом того, насколько они улучшили результат.
         """
-        sum_weight = np.sum(temp_weights)
-        if sum_weight == 0:
-            return 1.0
 
-        weights = temp_weights / sum_weight
-        sum_square = np.sum(weights * array * array)
-        sum_val = np.sum(weights * array)
+        _limit = self.success_filled
+        sum_weight = np.sum(temp_weights[:_limit])
+        self.weights = temp_weights[:_limit] / sum_weight
+        sum_square = np.sum(self.weights[:_limit] * array[:_limit] * array[:_limit])
+        sum_val = np.sum(self.weights[:_limit] * array[:_limit])
 
         if abs(sum_val) > self.threshold:
             return np.divide(sum_square, sum_val)
@@ -287,14 +283,6 @@ class Algorithm:
                 self.global_variables.sr_array[step_eval_func_count] = self.success_rate
 
                 self.global_variables.last_eval_step = step_eval_func_count
-
-    @staticmethod
-    def reflect(val, left, right):
-        if val < left:
-            return left + (left - val)
-        elif val > right:
-            return right - (val - right)
-        return val
 
     def remove_worst(self, _n_inds_front: int, new_n_inds_front: int):
         """
@@ -349,11 +337,9 @@ class Algorithm:
             self.global_variables.eval_func_calls += 1
             self.find_n_save_best(i_inds == 0, i_inds)
 
-            if (not self.global_variables.global_best_init
+            if (not self.global_variables.global_best == np.inf
                     or self.best_fitness_value < self.global_variables.global_best):
                 self.global_variables.global_best = self.best_fitness_value
-                self.global_variables.global_best_init = True
-
             self.save_best_values()
 
         # Копирование значений целевых функций и индексов
@@ -576,7 +562,11 @@ class Algorithm:
                                + self.f * (self.population[rand2].reshape(-1)[j]
                                            - self.front_population[rand3].reshape(-1)[j]))
 
-                        val = self.reflect(val, self.left, self.right)
+                        if val < self.left:
+                            val = random.choices([self.left, self.right])[0]
+                        if val > self.right:
+                            val = random.choices([self.left, self.right])[0]
+
                         self.trial_solution[j] = val
                         actual_cr += 1
                     else:
@@ -621,16 +611,12 @@ class Algorithm:
             # Вычисляем процент успешных мутаций
             self.success_rate = float(self.success_filled) / float(self.n_inds_front)
 
-            if self.n_inds_front < 4:
-                raise ValueError(f"Слишком мало индивидов в фронтовой популяции: {self.n_inds_front}")
-
             # Вычисляем новый размер фронтовой части популяции
             self.new_n_inds_front = int(
                 (4 - self.n_inds_front_max) / self.global_variables.max_eval_func_calls
                 * self.global_variables.eval_func_calls
                 + self.n_inds_front_max
             )
-            self.new_n_inds_front = max(4, self.new_n_inds_front)
 
             # Удаляем худшие решения из фронтовой части популяции
             self.remove_worst(self.n_inds_front, self.new_n_inds_front)
@@ -655,8 +641,10 @@ class Algorithm:
                 for i in range(self.n_inds_current):
                     self.indices[i] = i
 
-                min_fitness_value = np.min(self.fitness_func_values[:self.n_inds_current])
-                max_fitness_value = np.max(self.fitness_func_values[:self.n_inds_current])
+                min_fitness_value, max_fitness_value = self.minmax(
+                    array=self.fitness_func_values,
+                    limit=self.n_inds_current
+                )
 
                 if min_fitness_value != max_fitness_value:
                     self.fitness_func_values, self.indices = quick_sort_with_indices(
