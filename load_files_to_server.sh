@@ -9,5 +9,8 @@ read -r -p "Enter path to files: " filesPath
 echo "Load main running file"
 scp "$current_path"/run.py "$username"@"$host":"$filesPath"/run.py
 
+echo "load GNBG 2024 data"
+scp -r "$current_path"/gnbg24 "$username"@"$host":"$filesPath"/gnbg24
+
 echo "load L-SRTDE code"
 scp -r ./l_srtde/*[!.pdf] "$current_path"/l_srtde "$username"@"$host":"$filesPath"/l_srtde
