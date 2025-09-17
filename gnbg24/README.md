@@ -6,6 +6,8 @@ See original paper <a href="https://arxiv.org/pdf/2312.07083">here</a>.
 
 This benchmark can be used for single-objective, box-constrained, continuous numerical optimization.
 
+Dataset in folders **./mat**, **./txt** and algorithm for loading functions were taken from <a href="https://github.com/VladimirStanovov/L-SRTDE_GNBG-24">here</a>.
+
 ## For viewing matlab files
 Use <a href="https://octave.org/download">Octave GUI</a> for viewing original *.mat* files.
 
