@@ -1,3 +1,4 @@
+import os
 import subprocess
 import argparse
 from io import StringIO
@@ -75,3 +76,8 @@ if __name__ == '__main__':
             """.replace('__RESULTS__', str1))
 
         latex_to_pdf_subprocess(f'{prefix}results.tex')
+
+        # delete service tex files
+        os.remove(f'{prefix}results.tex')
+        os.remove(f'{prefix}results.log')
+        os.remove(f'{prefix}results.aux')

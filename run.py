@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 from l_srtde.algorithm import Algorithm
-from _gnbg_functions.gnbg import GNBG
+from gnbg24.gnbg import GNBG
 
 
 def run_algorithm_for_func(func_num, total_n_runs, population_size):
@@ -66,7 +66,22 @@ if __name__ == '__main__':
     parser.add_argument('--funcNum', type=int, default=24)
     parser.add_argument('--populationSize', type=int, default=10)
     parser.add_argument('--displayEpochLimit', type=int, default=1000)
+
+    # options
+    parser.add_argument(
+        '--isNeedPlotSaving',
+        action='store_true',
+        default=True
+    )
+    parser.add_argument(
+        '--isNeedPlotLogarithmic',
+        action='store_true',
+        default=True
+    )
     args = parser.parse_args()
+
+    is_need_saving = args.isNeedPlotSaving
+    is_need_log = args.isNeedPlotLogarithmic
 
     os.makedirs(Path('l_srtde', 'Results_Python_implementation'), exist_ok=True)
 
@@ -102,9 +117,6 @@ if __name__ == '__main__':
 
     print(f'Elapsed time: {round(time.time() - t0, 2)} sec')
 
-    is_need_saving = True
-    is_need_log = True
-
     fig = plt.figure(figsize=(24, 18), constrained_layout=True)
     gs = fig.add_gridspec(6, 4)
 
@@ -128,9 +140,6 @@ if __name__ == '__main__':
         ax.set_title(f"F{func_num + 1}", fontsize=16)
         ax.set_xlabel("Function Evaluations")
         ax.set_ylabel("Best Fitness (log scale)")
-
-        ax.grid(True, which="both", linestyle='--', linewidth=0.5)
-        ax.legend(fontsize='small', ncol=2)
 
     plt.tight_layout()
     if is_need_saving:
