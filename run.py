@@ -113,7 +113,7 @@ if __name__ == '__main__':
                 np.savetxt(Path(
                     'l_srtde', 'Results_Python_implementation',
                     f'L-SRTDE_GNBG_F{func_num+1}_D{result["dimension"]}.txt'
-                ), res[func_num], fmt='%.1f')
+                ), res[func_num], fmt='%.4f')
 
     print(f'Elapsed time: {round(time.time() - t0, 2)} sec')
 
