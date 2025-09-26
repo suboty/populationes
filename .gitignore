@@ -1,4 +1,4 @@
-# PyCharm service folder
+# PyCharm and VS Code service folders
 .idea
 .vscode
 *__pycache__
@@ -26,6 +26,10 @@
 # results
 Results/
 Results_Python_implementation/
+
+# original source code
+gnbg24/gnbg24.h
+l_srtde/L-SRTDE.cpp
 
 # other
 *.DS_Store
