@@ -1,6 +1,6 @@
 #!/bin/bash
 
-current_path="$(pwd)"
+current_path="../l_srtde/"
 
 read -r -p "Enter username: " username
 read -r -p "Enter host: " host
