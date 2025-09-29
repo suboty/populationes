@@ -15,15 +15,4 @@ load_original_code() {
   rm -rf tmp_repo
 }
 
-prepare_original_code() {
-  if sed --version >/dev/null 2>&1; then
-    # Linux (GNU sed)
-    sed -i 's|#include "gnbg24.h"|#include "../gnbg24/gnbg24.h"|g' "$filename"
-  else
-    # macOS / BSD sed
-    sed -i '' 's|#include "gnbg24.h"|#include "../gnbg24/gnbg24.h"|g' "$filename"
-  fi
-}
-
 load_original_code
-prepare_original_code
