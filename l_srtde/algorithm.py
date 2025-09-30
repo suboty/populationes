@@ -14,10 +14,10 @@ class AlgorithmConst:
     Константы для алгоритма.
 
     Аттрибуты:
-        records_number_per_function: количество точек данных, сохраненных в массиве результатов.
+        records: количество точек данных, сохраненных в массиве результатов.
         global_seed: глобальный seed для всех генераторов.
     """
-    records_number_per_function = 1001
+    records = 1001
     global_seed = 2025
 
 
@@ -36,9 +36,9 @@ class AlgorithmGlobals:
         eval_func_opt_value: оптимальное значение целевой функции.
         global_best: наилучшее значение целевой функции, найденное глобально (в текущей итерации).
     """
-    eval_steps = np.zeros(AlgorithmConst.records_number_per_function - 1)
-    result_array = np.zeros(AlgorithmConst.records_number_per_function)
-    sr_array = np.zeros(AlgorithmConst.records_number_per_function)
+    eval_steps = np.zeros(AlgorithmConst.records - 1)
+    result_array = np.zeros(AlgorithmConst.records)
+    sr_array = np.zeros(AlgorithmConst.records)
     last_eval_step = 0
     eval_func_calls = 0
     max_eval_func_calls = 0
@@ -240,8 +240,8 @@ class Algorithm:
 
         # Подготовка шагов оценки
         self.globals.eval_steps = [
-            10000.0 / (self.consts.records_number_per_function - 1) * self.n_vars * (steps_k + 1)
-            for steps_k in range(self.consts.records_number_per_function - 1)
+            10000.0 / (self.consts.records - 1) * self.n_vars * (steps_k + 1)
+            for steps_k in range(self.consts.records - 1)
         ]
 
         # Инициализация массивов
@@ -315,17 +315,13 @@ class Algorithm:
         траектории алгоритма оптимизации.
         """
         temp = self.globals.global_best - self.globals.eval_func_opt_value
-        if temp <= self.threshold and self.globals.result_array[
-            self.consts.records_number_per_function - 1
-        ] == self.globals.max_eval_func_calls:
+        if (temp <= self.threshold and
+                self.globals.result_array[self.consts.records-1] == self.globals.max_eval_func_calls):
             self.globals.result_array[
-                self.consts.records_number_per_function - 1
+                self.consts.records - 1
                 ] = self.globals.eval_func_calls
 
-        for step_eval_func_count in range(
-                self.globals.last_eval_step,
-                self.consts.records_number_per_function - 1
-        ):
+        for step_eval_func_count in range(self.globals.last_eval_step, self.consts.records-1):
             if self.globals.eval_func_calls == self.globals.eval_steps[
                 step_eval_func_count
             ]:
@@ -470,10 +466,7 @@ class Algorithm:
                 fitness_temp2[i] = np.exp(-i / self.n_inds_front * 3)
             component_selector_front = self._generators.create_weighted_selector(fitness_temp2)
 
-            p_size_val = max(
-                2,
-                int(self.n_inds_front * 0.7 * np.exp(-self.success_rate * 7))
-            )
+            p_size_val = max(2, int(self.n_inds_front * 0.7 * np.exp(-self.success_rate * 7)))
 
             # Итерируемся по фронтовой части популяции
             for i_ind in range(self.n_inds_front):
@@ -510,8 +503,7 @@ class Algorithm:
                 rand2 = self.indices2[component_selector_front()]
                 rand2_pop = self.indices2[rand2]
                 max_at, at = 100, 0
-                while (rand2_pop == p_rand or rand2_pop == rand1_pop
-                       or rand2_pop == chosen_pop_idx) and max_at < at:
+                while (rand2_pop == p_rand or rand2_pop == rand1_pop or rand2_pop == chosen_pop_idx) and max_at < at:
                     rand2 = self.indices2[component_selector_front()]
                     rand2_pop = self.indices2[rand2]
                     at += 1
