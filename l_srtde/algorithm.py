@@ -1,5 +1,8 @@
+import os
 import time
 import random
+import warnings
+from pathlib import Path
 from typing import List, Callable, Union
 
 import numpy as np
@@ -128,9 +131,32 @@ class Algorithm:
             right: int = 100,
             verbose: bool = True
     ):
+        warnings.filterwarnings("ignore")
+
+        self.run_id = int(round(time.time(), 5)*100_000)
+        self.tmp_folder = Path('tmp', f'tmp_{self.run_id}')
+
         self.is_last_call = False
         self.t0 = time.time()
         self.verbose = verbose
+
+        if self.verbose:
+            os.makedirs('tmp', exist_ok=True)
+            os.makedirs(self.tmp_folder, exist_ok=True)
+
+            # Массивы и файлы для хранения всех изменений в параметрах
+            self.tmp_eval_calls = []
+            open(Path(self.tmp_folder, 'eval_calls'), 'a').close()
+            self.tmp_f = []
+            open(Path(self.tmp_folder, 'f'), 'a').close()
+            self.tmp_cr = []
+            open(Path(self.tmp_folder, 'cr'), 'a').close()
+            self.tmp_front = []
+            open(Path(self.tmp_folder, 'front'), 'a').close()
+            self.tmp_sr = []
+            open(Path(self.tmp_folder, 'sr'), 'a').close()
+            self.tmp_sf = []
+            open(Path(self.tmp_folder, 'sf'), 'a').close()
 
         # Инициализация целевой функции
         self.fitness_function = fitness_function
@@ -167,6 +193,7 @@ class Algorithm:
         self.success_rate = 0.5
         # Параметры ДЭ
         self.f = 0.0
+        self.mean_F = 0.0
         self.cr = 0.0
         # Границы решения
         self.left, self.right = left, right
@@ -282,6 +309,14 @@ class Algorithm:
                 self.global_variables.result_array[step_eval_func_count] = temp
                 self.global_variables.sr_array[step_eval_func_count] = self.success_rate
 
+                # Сохраняем текущие значения параметров
+                self.tmp_eval_calls.append(self.global_variables.eval_func_calls)
+                self.tmp_f.append(round(self.mean_F, 2))
+                self.tmp_cr.append(round(self.cr, 2))
+                self.tmp_front.append(self.n_inds_front)
+                self.tmp_sr.append(round(self.success_rate, 3))
+                self.tmp_sf.append(self.success_filled)
+
                 self.global_variables.last_eval_step = step_eval_func_count
 
     def remove_worst(self, _n_inds_front: int, new_n_inds_front: int):
@@ -326,11 +361,11 @@ class Algorithm:
         max_value = np.max(array[:limit])
         return min_value, max_value
 
+    def __name__(self):
+        return self.run_id
+
     def __call__(self):
         """Запуск алгоритма L-SRTDE."""
-        if self.verbose:
-            print(f"Starting main cycle: max evals {self.global_variables.max_eval_func_calls}")
-
         # Инициализация значений целевой функции для стартовой популяции
         for i_inds in range(self.n_inds_front):
             self.fitness_func_values[i_inds] = self.fitness_function(self.population[i_inds])
@@ -376,25 +411,16 @@ class Algorithm:
             epoch_num += 1
 
             _dif_calls = self.global_variables.max_eval_func_calls - self.global_variables.eval_func_calls
-            if self.verbose and _dif_calls < 50_000 and not self.is_last_call:
-                print(f'### Left {_dif_calls} calls')
-                self.is_last_call = True
 
             _max_calls = self.global_variables.max_eval_func_calls
             _current_calls = self.global_variables.eval_func_calls
 
             if self.verbose and self.iter_number % (self.global_variables.max_eval_func_calls // 1_000) == 0:
-                print(
-                    f'--- Iteration {self.iter_number}, '
-                    f'left {_max_calls-_current_calls} calls, '
-                    f'current best fitness value: {self.global_variables.global_best}, '
-                    f'elapsed: {round(time.time()-self.t0, 2)} seconds'
-                )
                 self.t0 = time.time()
 
             # Расчет параметров
-            mean_F = 0.4 + np.tanh(self.success_rate * 5) * 0.25
-            sigma_F = 0.02
+            self.mean_F = 0.4 + np.tanh(self.success_rate * 5) * 0.25
+            sigma_F = 0.02  
 
             # Копируем и сортируем значения целевой функции для всей популяции
             for i in range(self.n_inds_front):
@@ -540,7 +566,7 @@ class Algorithm:
 
                 # Генерация F и cr с ограничениями
                 # Параметр мутации F
-                self.f = np.clip(np.random.normal(mean_F, sigma_F), 0.0, 1.0)
+                self.f = np.clip(np.random.normal(self.mean_F, sigma_F), 0.0, 1.0)
 
                 # Параметр кроссовера cr из памяти
                 self.cr = np.random.normal(self.cr_memory[self.memory_index], 0.05)
@@ -599,15 +625,6 @@ class Algorithm:
 
                 self.save_best_values()
 
-                temp_fit_val = float(temp_fit) if np.isscalar(temp_fit) else float(temp_fit.item())
-                front_val = float(self.fitness_func_values_front[self.chosen_index])
-
-                if (self.verbose and temp_fit <= self.fitness_func_values_front[self.chosen_index]
-                        and i_ind in verbose_i):
-                    print(f"\t Success: new fitness={temp_fit_val:.4f}, "
-                          f"improvement={front_val - temp_fit_val:.4f}, "
-                          f"pf_index={self.pf_index}")
-
             # Вычисляем процент успешных мутаций
             self.success_rate = float(self.success_filled) / float(self.n_inds_front)
 
@@ -626,11 +643,14 @@ class Algorithm:
             self.update_cr_memory()
             # Обновляем текущий размер популяции
             self.n_inds_current = self.n_inds_front + self.success_filled
-            if epoch_num % 1000 == 0 and epoch_num > 0 and self.verbose:
-                print(f'\tEpoch {epoch_num} | eval calls: {self.global_variables.eval_func_calls} '
-                      f'| Current Optimum: {round(self.global_variables.global_best,3)} '
-                      f'| F: {round(mean_F,2)} | Cr: {round(self.cr,2)} | Front size: {self.n_inds_front} '
-                      f'| SR: {round(self.success_rate,3)} | SF: {self.success_filled}')
+
+            if self.verbose:
+                # Выводим на экран текущие значения параметров
+                if epoch_num % 1000 == 0 and epoch_num > 0:
+                    print(f'\t {self.run_id} | Epoch {epoch_num} | eval calls: {self.global_variables.eval_func_calls} '
+                          f'| Current Optimum: {round(self.global_variables.global_best,3)} '
+                          f'| F: {round(self.mean_F,2)} | Cr: {round(self.cr,2)} | Front size: {self.n_inds_front} '
+                          f'| SR: {round(self.success_rate,3)} | SF: {self.success_filled}')
             # Обнуляем количество успешных мутаций
             self.success_filled = 0
             # Увеличиваем счетчик поколений
@@ -660,11 +680,18 @@ class Algorithm:
                     self.temp_population[i] = self.population[self.indices[i]].copy()
                     self.population[i] = self.temp_population[i].copy()
 
-            if self.verbose and self.iter_number % (self.global_variables.max_eval_func_calls // 1_000) == 0:
-                print(f"End of iteration {self.iter_number}: global_best={self.global_variables.global_best}, "
-                      f"n_inds_front={self.n_inds_front}, success_rate={self.success_rate:.3f}")
-
         if self.verbose:
-            print(f'--- Global best: {self.global_variables.global_best}')
+            with open(Path(self.tmp_folder, 'eval_calls'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_eval_calls]))
+            with open(Path(self.tmp_folder, 'f'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_f]))
+            with open(Path(self.tmp_folder, 'cr'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_cr]))
+            with open(Path(self.tmp_folder, 'front'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_front]))
+            with open(Path(self.tmp_folder, 'sr'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_sr]))
+            with open(Path(self.tmp_folder, 'sf'), 'r+') as f:
+                f.write(' '.join([str(x) for x in self.tmp_sf]))
 
-        return None, self.global_variables.global_best
+        return self.run_id, self.global_variables.global_best

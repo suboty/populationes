@@ -1,7 +1,10 @@
+import json
 import os
 import time
 import argparse
 import traceback
+import warnings
+from typing import Dict, Tuple
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -13,25 +16,34 @@ from l_srtde.algorithm import Algorithm
 from gnbg24.gnbg import GNBG
 
 
-def run_algorithm_for_func(func_num, total_n_runs, population_size):
+def run_algorithm_for_func(
+        func_num: int,
+        total_n_runs: int,
+        population_size: int,
+        verbose: bool
+) -> Tuple[Dict, Dict]:
     result_dict = {}
+    run_id = {}
     try:
         gnbg = GNBG(func_num + 1)
         fopt = gnbg.optimum_value
-        print(f'Func {func_num + 1} | Real optimum: {fopt}')
 
         _optimums = np.zeros(total_n_runs)
         res = np.zeros((total_n_runs, 1001))
         sr_res = np.zeros((total_n_runs, 1001))
 
+        run_id.setdefault(func_num, {})
+
         for run in range(total_n_runs):
-            print(f"Func {func_num + 1} | Running algorithm, run {run + 1}")
             optz = Algorithm(
                 fitness_function=gnbg.fitness,
                 population_size=population_size * gnbg.dimension,
                 problem_dimension=gnbg.dimension,
-                verbose=False
+                verbose=verbose
             )
+            _id = optz.__name__()
+            run_id[func_num][_id] = run
+            print(f"{_id} | Func {func_num + 1} | Running algorithm, run {run + 1}")
             optz.global_variables.eval_func_opt_value = fopt
             optz.global_variables.max_eval_func_calls = gnbg.max_evals
             optz.global_variables.result_array[
@@ -42,7 +54,7 @@ def run_algorithm_for_func(func_num, total_n_runs, population_size):
             _optimums[run] = optimum
             res[run] = optz.global_variables.result_array
             sr_res[run] = optz.global_variables.sr_array
-            print(f'Func {func_num + 1} | Run {run + 1} finished, Found optimum: {optimum}')
+            print(f'{_id} | Func {func_num + 1} | Run {run + 1} finished, Found optimum: {optimum}')
 
         result_dict = {
             'func_num': func_num,
@@ -57,10 +69,13 @@ def run_algorithm_for_func(func_num, total_n_runs, population_size):
     except Exception as e:
         print(f'### Error in function {func_num}: {e}')
         print(traceback.format_exc())
-    return result_dict
+
+    return run_id, result_dict
 
 
 if __name__ == '__main__':
+    warnings.filterwarnings('ignore')
+
     parser = argparse.ArgumentParser(prog='populationes-runs')
     parser.add_argument('--runNum', type=int, default=31)
     parser.add_argument('--funcNum', type=int, default=24)
@@ -78,10 +93,16 @@ if __name__ == '__main__':
         action='store_true',
         default=True
     )
+    parser.add_argument(
+        '--isNeedTmpSaving',
+        type=str,
+        default='y'
+    )
     args = parser.parse_args()
 
     is_need_saving = args.isNeedPlotSaving
     is_need_log = args.isNeedPlotLogarithmic
+    is_need_tmp = args.isNeedTmpSaving
 
     os.makedirs(Path('l_srtde', 'Results_Python_implementation'), exist_ok=True)
 
@@ -96,13 +117,18 @@ if __name__ == '__main__':
     fopts = np.zeros(max_n_funcs)
 
     t0 = time.time()
+    run_ids = {}
     with ProcessPoolExecutor() as executor:
         futures = [
-            executor.submit(run_algorithm_for_func, func_num, total_n_runs, population_size)
+            executor.submit(
+                run_algorithm_for_func,
+                func_num, total_n_runs, population_size, is_need_tmp
+            )
             for func_num in range(max_n_funcs)
         ]
         for future in as_completed(futures):
-            result = future.result()
+            run_id, result = future.result()
+            run_ids = run_ids | run_id
             if result:
                 func_num = result['func_num']
                 res[func_num] = result['res']
@@ -116,6 +142,10 @@ if __name__ == '__main__':
                 ), res[func_num], fmt='%.4f')
 
     print(f'Elapsed time: {round(time.time() - t0, 2)} sec')
+
+    if is_need_tmp:
+        with open(Path('tmp', 'run_ids.json'), 'w') as f:
+            json.dump(run_ids, f)
 
     fig = plt.figure(figsize=(24, 18), constrained_layout=True)
     gs = fig.add_gridspec(6, 4)
