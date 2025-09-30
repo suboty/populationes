@@ -47,7 +47,7 @@ def run_algorithm_for_func(
             optz.globals.eval_func_opt_value = fopt
             optz.globals.max_eval_func_calls = gnbg.max_evals
             optz.globals.result_array[
-                optz.consts.records_number_per_function-1
+                optz.consts.records-1
             ] = gnbg.max_evals
             _, optimum = optz()
 

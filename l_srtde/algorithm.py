@@ -31,7 +31,7 @@ class AlgorithmGlobals:
         sr_array: хранит значения истории успешности.
         last_eval_step: счетчик для хранения последнего шага оценки.
         eval_func_calls: счетчик для хранения количества текущих вызовов целевой функции.
-        max_eval_func_calls: максимальное количество вызовов целевой функции (ограничение).
+        max_calls: максимальное количество вызовов целевой функции (ограничение).
         problem_dimension: размерность задачи.
         eval_func_opt_value: оптимальное значение целевой функции.
         global_best: наилучшее значение целевой функции, найденное глобально (в текущей итерации).
@@ -41,11 +41,10 @@ class AlgorithmGlobals:
     sr_array = np.zeros(AlgorithmConst.records)
     last_eval_step = 0
     eval_func_calls = 0
-    max_eval_func_calls = 0
+    max_calls = 0
     problem_dimension = 30
     eval_func_opt_value = None
     global_best = np.inf
-
 
 
 class AlgorithmRandomGenerators:
@@ -151,7 +150,7 @@ class Algorithm:
             self,
             fitness_function: Callable,
             problem_dimension: int,
-            population_size: int,
+            pop_size: int,
             left: int = -100,
             right: int = 100,
             verbose: bool = True
@@ -170,25 +169,14 @@ class Algorithm:
             os.makedirs(self.tmp_folder, exist_ok=True)
 
             # Массивы и файлы для хранения всех изменений в параметрах
-            self.tmp_eval_calls = []
-            open(Path(self.tmp_folder, 'eval_calls'), 'a').close()
-            self.tmp_f = []
-            open(Path(self.tmp_folder, 'f'), 'a').close()
-            self.tmp_cr = []
-            open(Path(self.tmp_folder, 'cr'), 'a').close()
-            self.tmp_front = []
-            open(Path(self.tmp_folder, 'front'), 'a').close()
-            self.tmp_sr = []
-            open(Path(self.tmp_folder, 'sr'), 'a').close()
-            self.tmp_sf = []
-            open(Path(self.tmp_folder, 'sf'), 'a').close()
+            self.create_empty_folders(['eval_calls', 'f', 'cr', 'front', 'sf', 'sr',])
 
         # Инициализация целевой функции
         self.fitness_function = fitness_function
 
         # Счетчики и локальные переменные
         self.memory_size = 5
-        self.memory_iter = 0
+        self.memory_i = 0
         self.memory_index = 0
         self.success_filled = 0
 
@@ -201,11 +189,11 @@ class Algorithm:
         self.n_vars = problem_dimension
 
         # Размеры популяции
-        self.n_inds_current = population_size
-        self.n_inds_front = population_size
-        self.n_inds_front_max = population_size
+        self.n_inds_current = pop_size
+        self.n_inds_front = pop_size
+        self.n_inds_front_max = pop_size
         self.new_n_inds_front = 0
-        self.population_size = population_size * 2
+        self.pop_size = pop_size * 2
 
         # Индексы и счетчики
         self.chosen_index = 0
@@ -224,16 +212,16 @@ class Algorithm:
         self.left, self.right = left, right
 
         # Списки
-        self.population = []
-        self.front_population = []
-        self.temp_population = []
-        self.fitness_func_values = []
-        self.fitness_func_values_copy = []
-        self.fitness_func_values_front = []
+        self.pop = []
+        self.front_pop = []
+        self.temp_pop = []
+        self.fit_func_values = []
+        self.fit_func_values_copy = []
+        self.fit_func_values_front = []
         self.trial_solution = []
         self.temp_success_cr = []
         self.cr_memory = []
-        self.fitness_values_dif = []
+        self.fit_values_dif = []
         self.weights = []
         self.indices = []
         self.indices2 = []
@@ -245,23 +233,33 @@ class Algorithm:
         ]
 
         # Инициализация массивов
-        self.population = np.random.uniform(self.left, self.right, size=(self.population_size, self.n_vars))
-        self.front_population = np.zeros((self.n_inds_front, self.n_vars))
-        self.temp_population = np.zeros((self.population_size, self.n_vars))
+        self.pop = np.random.uniform(self.left, self.right, size=(self.pop_size, self.n_vars))
+        self.front_pop = np.zeros((self.n_inds_front, self.n_vars))
+        self.temp_pop = np.zeros((self.pop_size, self.n_vars))
 
-        self.fitness_func_values = np.zeros(self.population_size)
-        self.fitness_func_values_copy = np.zeros(self.population_size)
-        self.fitness_func_values_front = np.zeros(self.n_inds_front)
+        self.fit_func_values = np.zeros(self.pop_size)
+        self.fit_func_values_copy = np.zeros(self.pop_size)
+        self.fit_func_values_front = np.zeros(self.n_inds_front)
 
-        self.weights = np.zeros(self.population_size)
-        self.temp_success_cr = np.zeros(self.population_size)
-        self.fitness_values_dif = np.zeros(self.population_size)
+        self.weights = np.zeros(self.pop_size)
+        self.temp_success_cr = np.zeros(self.pop_size)
+        self.fit_values_dif = np.zeros(self.pop_size)
 
         self.cr_memory = np.ones(self.memory_size)
         self.trial_solution = np.zeros(self.n_vars)
 
-        self.indices = np.zeros(self.population_size, dtype=int)
-        self.indices2 = np.zeros(self.population_size, dtype=int)
+        self.indices = np.zeros(self.pop_size, dtype=int)
+        self.indices2 = np.zeros(self.pop_size, dtype=int)
+        
+    def create_empty_folders(self, folder_names: List):
+        for folder_name in folder_names:
+            open(Path(self.tmp_folder, folder_name), 'a').close()
+            setattr(Algorithm, folder_name, [])
+
+    def save_tmp_results(self, folder_names: List):
+        for folder_name in folder_names:
+            with open(Path(self.tmp_folder, folder_name), 'r+') as f:
+                f.write(' '.join([str(x) for x in getattr(Algorithm, 'tmp_'+str(folder_name))]))
 
     def update_cr_memory(self):
         """
@@ -269,13 +267,9 @@ class Algorithm:
         на основе успешных значений, найденных в текущем поколении.
         """
         if self.success_filled != 0:
-            new_cr = 0.5 * (
-                    self.mean_wl(
-                        self.temp_success_cr, self.fitness_values_dif
-                    ) + self.cr_memory[self.memory_iter]
-            )
-            self.cr_memory[self.memory_iter] = new_cr
-            self.memory_iter = (self.memory_iter + 1) % self.memory_size
+            new_cr = 0.5 * (self.mean_wl(self.temp_success_cr, self.fit_values_dif) + self.cr_memory[self.memory_i])
+            self.cr_memory[self.memory_i] = new_cr
+            self.memory_i = (self.memory_i + 1) % self.memory_size
 
     def mean_wl(
             self,
@@ -304,8 +298,8 @@ class Algorithm:
         Функция обновляет локальные
         и глобальные лучшие значения целевой функции.
         """
-        if self.fitness_func_values[ind_iter] <= self.best_fitness_value or init:
-            self.best_fitness_value = self.fitness_func_values[ind_iter]
+        if self.fit_func_values[ind_iter] <= self.best_fitness_value or init:
+            self.best_fitness_value = self.fit_func_values[ind_iter]
         if self.best_fitness_value < self.globals.global_best or init:
             self.globals.global_best = self.best_fitness_value
 
@@ -315,8 +309,7 @@ class Algorithm:
         траектории алгоритма оптимизации.
         """
         temp = self.globals.global_best - self.globals.eval_func_opt_value
-        if (temp <= self.threshold and
-                self.globals.result_array[self.consts.records-1] == self.globals.max_eval_func_calls):
+        if temp <= self.threshold and self.globals.result_array[self.consts.records-1] == self.globals.max_calls:
             self.globals.result_array[
                 self.consts.records - 1
                 ] = self.globals.eval_func_calls
@@ -350,17 +343,16 @@ class Algorithm:
         points_to_remove = _n_inds_front - new_n_inds_front
 
         for l in range(points_to_remove):
-            worst = np.argmax(self.fitness_func_values_front[:_n_inds_front])
+            worst = np.argmax(self.fit_func_values_front[:_n_inds_front])
 
             # Сдвиг
-            self.front_population[worst:_n_inds_front-1] = self.front_population[worst+1:_n_inds_front]
-            self.fitness_func_values_front[worst:_n_inds_front-1] \
-                = self.fitness_func_values_front[worst+1:_n_inds_front]
+            self.front_pop[worst:_n_inds_front-1] = self.front_pop[worst+1:_n_inds_front]
+            self.fit_func_values_front[worst:_n_inds_front-1] = self.fit_func_values_front[worst+1:_n_inds_front]
             _n_inds_front -= 1
 
             # «Очистить» хвост
-            self.front_population[new_n_inds_front:] = 0.0
-            self.fitness_func_values_front[new_n_inds_front:] = np.inf
+            self.front_pop[new_n_inds_front:] = 0.0
+            self.fit_func_values_front[new_n_inds_front:] = np.inf
         return _n_inds_front
 
     @staticmethod
@@ -376,27 +368,26 @@ class Algorithm:
         """Запуск алгоритма L-SRTDE."""
         # Инициализация значений целевой функции для стартовой популяции
         for i_inds in range(self.n_inds_front):
-            self.fitness_func_values[i_inds] = self.fitness_function(self.population[i_inds])
+            self.fit_func_values[i_inds] = self.fitness_function(self.pop[i_inds])
             self.globals.eval_func_calls += 1
             self.find_n_save_best(i_inds == 0, i_inds)
 
-            if (not self.globals.global_best == np.inf
-                    or self.best_fitness_value < self.globals.global_best):
+            if not self.globals.global_best == np.inf or self.best_fitness_value < self.globals.global_best:
                 self.globals.global_best = self.best_fitness_value
             self.save_best_values()
 
         # Копирование значений целевых функций и индексов
         for i in range(self.n_inds_front):
-            self.fitness_func_values_copy[i] = self.fitness_func_values[i].copy()
+            self.fit_func_values_copy[i] = self.fit_func_values[i].copy()
             self.indices[i] = i
 
         # Определение мин/макс целевой функции        
-        min_fit_val, max_fit_val = self.minmax(array=self.fitness_func_values, limit=self.n_inds_front)
+        min_fit_val, max_fit_val = self.minmax(array=self.fit_func_values, limit=self.n_inds_front)
 
         # Сортировка и обновление фронтовой части популяции
         if min_fit_val != max_fit_val:
-            self.fitness_func_values_copy, self.indices = quick_sort_with_indices(
-                array=self.fitness_func_values_copy,
+            self.fit_func_values_copy, self.indices = quick_sort_with_indices(
+                array=self.fit_func_values_copy,
                 indices=self.indices,
                 left=0,
                 right=self.n_inds_front - 1,
@@ -404,23 +395,23 @@ class Algorithm:
 
         # Обновляем фронтовую часть популяции согласно сортировке
         for i in range(self.n_inds_front):
-            self.front_population[i] = self.population[self.indices[i]].copy()
-            self.fitness_func_values_front[i] = self.fitness_func_values_copy[i]
+            self.front_pop[i] = self.pop[self.indices[i]].copy()
+            self.fit_func_values_front[i] = self.fit_func_values_copy[i]
 
         self.pf_index = 0
         epoch_num = 0
 
         # Главный цикл алгоритма
         # Пока не дойдем до максимума вычислений целевой функции
-        while self.globals.eval_func_calls < self.globals.max_eval_func_calls:
+        while self.globals.eval_func_calls < self.globals.max_calls:
             epoch_num += 1
 
-            _dif_calls = self.globals.max_eval_func_calls - self.globals.eval_func_calls
+            _dif_calls = self.globals.max_calls - self.globals.eval_func_calls
 
-            _max_calls = self.globals.max_eval_func_calls
+            _max_calls = self.globals.max_calls
             _current_calls = self.globals.eval_func_calls
 
-            if self.verbose and self.iter_number % (self.globals.max_eval_func_calls // 1_000) == 0:
+            if self.verbose and self.iter_number % (self.globals.max_calls // 1_000) == 0:
                 self.t0 = time.time()
 
             # Расчет параметров
@@ -429,14 +420,14 @@ class Algorithm:
 
             # Копируем и сортируем значения целевой функции для всей популяции
             for i in range(self.n_inds_front):
-                self.fitness_func_values_copy[i] = self.fitness_func_values[i]
+                self.fit_func_values_copy[i] = self.fit_func_values[i]
                 self.indices[i] = i
 
-            min_fit_val, max_fit_val = self.minmax(array=self.fitness_func_values, limit=self.n_inds_front)
+            min_fit_val, max_fit_val = self.minmax(array=self.fit_func_values, limit=self.n_inds_front)
 
             if min_fit_val != max_fit_val:
-                self.fitness_func_values_copy, self.indices = quick_sort_with_indices(
-                    array=self.fitness_func_values_copy,
+                self.fit_func_values_copy, self.indices = quick_sort_with_indices(
+                    array=self.fit_func_values_copy,
                     indices=self.indices,
                     left=0,
                     right=self.n_inds_front - 1,
@@ -444,17 +435,14 @@ class Algorithm:
 
             # Аналогично сортируем значения целевой функции для фронтовой части популяции
             for i in range(self.n_inds_front):
-                self.fitness_func_values_copy[i] = self.fitness_func_values_front[i]
+                self.fit_func_values_copy[i] = self.fit_func_values_front[i]
                 self.indices2[i] = i
 
-            min_fit_val, max_fit_val = self.minmax(
-                array=self.fitness_func_values_front,
-                limit=self.n_inds_front
-            )
+            min_fit_val, max_fit_val = self.minmax(array=self.fit_func_values_front,limit=self.n_inds_front)
 
             if min_fit_val != max_fit_val:
-                self.fitness_func_values_copy, self.indices2 = quick_sort_with_indices(
-                    array=self.fitness_func_values_copy,
+                self.fit_func_values_copy, self.indices2 = quick_sort_with_indices(
+                    array=self.fit_func_values_copy,
                     indices=self.indices2,
                     left=0,
                     right=self.n_inds_front - 1,
@@ -473,7 +461,7 @@ class Algorithm:
                 # Выбираем индекс из фронтовой части популяции
                 self.chosen_index = self._generators.int_random(self.n_inds_front-1)
 
-                # Выбираем индекс выбранного индивида в координатах population
+                # Выбираем индекс выбранного индивида в координатах pop
                 chosen_pop_idx = self.indices2[self.chosen_index]
 
                 # Выбираем индекс из памяти
@@ -537,11 +525,11 @@ class Algorithm:
 
                 for j in range(self.n_vars):
                     if self._generators.random(0., 1.) < self.cr or will_crossover == j:
-                        val = (self.population[rand1].reshape(-1)[j]
-                               + self.f * (self.front_population[p_rand].reshape(-1)[j]
-                                           - self.population[self.chosen_index].reshape(-1)[j])
-                               + self.f * (self.population[rand2].reshape(-1)[j]
-                                           - self.front_population[rand3].reshape(-1)[j]))
+                        val = (self.pop[rand1].reshape(-1)[j]
+                               + self.f * (self.front_pop[p_rand].reshape(-1)[j]
+                                           - self.pop[self.chosen_index].reshape(-1)[j])
+                               + self.f * (self.pop[rand2].reshape(-1)[j]
+                                           - self.front_pop[rand3].reshape(-1)[j]))
 
                         if val < self.left:
                             val = self._generators.choices([self.left, self.right])[0]
@@ -551,7 +539,7 @@ class Algorithm:
                         self.trial_solution[j] = val
                         actual_cr += 1
                     else:
-                        self.trial_solution[j] = self.front_population[self.chosen_index].reshape(-1)[j]
+                        self.trial_solution[j] = self.front_pop[self.chosen_index].reshape(-1)[j]
 
                 actual_cr /= float(self.n_vars)
 
@@ -559,19 +547,19 @@ class Algorithm:
                 temp_fit = self.fitness_function(self.trial_solution)
                 self.globals.eval_func_calls += 1
 
-                if temp_fit <= self.fitness_func_values_front[self.chosen_index]:
+                if temp_fit <= self.fit_func_values_front[self.chosen_index]:
                     # Если улучшение найдено
                     idx = self.n_inds_front + self.success_filled
-                    self.population[idx] = self.trial_solution.copy()
-                    self.front_population[self.pf_index] = self.trial_solution.copy()
-                    self.fitness_func_values[idx] = temp_fit
-                    self.fitness_func_values_front[self.pf_index] = temp_fit
+                    self.pop[idx] = self.trial_solution.copy()
+                    self.front_pop[self.pf_index] = self.trial_solution.copy()
+                    self.fit_func_values[idx] = temp_fit
+                    self.fit_func_values_front[self.pf_index] = temp_fit
                     # Обновляем лучшее решение
                     self.find_n_save_best(False, idx)
                     # Сохраняем cr
                     self.temp_success_cr[self.success_filled] = actual_cr
-                    self.fitness_values_dif[self.success_filled] = abs(
-                        self.fitness_func_values_front[self.chosen_index] - temp_fit
+                    self.fit_values_dif[self.success_filled] = abs(
+                        self.fit_func_values_front[self.chosen_index] - temp_fit
                     )
 
                     self.success_filled += 1
@@ -585,7 +573,7 @@ class Algorithm:
 
             # Вычисляем новый размер фронтовой части популяции
             self.new_n_inds_front = int(
-                (4 - self.n_inds_front_max) / self.globals.max_eval_func_calls
+                (4 - self.n_inds_front_max) / self.globals.max_calls
                 * self.globals.eval_func_calls
                 + self.n_inds_front_max
             )
@@ -616,14 +604,11 @@ class Algorithm:
                 for i in range(self.n_inds_current):
                     self.indices[i] = i
 
-                min_fit_val, max_fit_val = self.minmax(
-                    array=self.fitness_func_values,
-                    limit=self.n_inds_current
-                )
+                min_fit_val, max_fit_val = self.minmax(array=self.fit_func_values, limit=self.n_inds_current)
 
                 if min_fit_val != max_fit_val:
-                    self.fitness_func_values, self.indices = quick_sort_with_indices(
-                        array=self.fitness_func_values,
+                    self.fit_func_values, self.indices = quick_sort_with_indices(
+                        array=self.fit_func_values,
                         indices=self.indices,
                         left=0,
                         right=self.n_inds_current - 1,
@@ -632,21 +617,10 @@ class Algorithm:
                 self.n_inds_current = self.n_inds_front
 
                 for i in range(self.n_inds_current):
-                    self.temp_population[i] = self.population[self.indices[i]].copy()
-                    self.population[i] = self.temp_population[i].copy()
+                    self.temp_pop[i] = self.pop[self.indices[i]].copy()
+                    self.pop[i] = self.temp_pop[i].copy()
 
         if self.verbose:
-            with open(Path(self.tmp_folder, 'eval_calls'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_eval_calls]))
-            with open(Path(self.tmp_folder, 'f'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_f]))
-            with open(Path(self.tmp_folder, 'cr'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_cr]))
-            with open(Path(self.tmp_folder, 'front'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_front]))
-            with open(Path(self.tmp_folder, 'sr'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_sr]))
-            with open(Path(self.tmp_folder, 'sf'), 'r+') as f:
-                f.write(' '.join([str(x) for x in self.tmp_sf]))
+            self.save_tmp_results(folder_names=['eval_calls', 'f', 'cr', 'front', 'sr', 'sf'])
 
         return self.run_id, self.globals.global_best
