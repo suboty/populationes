@@ -33,3 +33,7 @@ l_srtde/L-SRTDE.cpp
 
 # other
 *.DS_Store
+
+# GNBG 2024 functions
+*.txt
+*.mat
