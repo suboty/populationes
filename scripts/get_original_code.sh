@@ -1,5 +1,7 @@
 #!/bin/bash
 
+current_path="l_srtde"
+
 repoUrl="https://github.com/VladimirStanovov/L-SRTDE_GNBG-24"
 filename="L-SRTDE.cpp"
 branch="master"
@@ -10,7 +12,7 @@ load_original_code() {
   cd tmp_repo || exit 1
   git sparse-checkout init
   git sparse-checkout set "./$filename"
-  mv "./$filename" "../$filename"
+  mv "$current_path/$filename" "../$current_path/$filename"
   cd ..
   rm -rf tmp_repo
 }

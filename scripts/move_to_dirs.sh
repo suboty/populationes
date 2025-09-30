@@ -1,6 +1,6 @@
 #!/bin/bash
 
-current_path='../gnbg24/'
+current_path='gnbg24'
 
 ls mat || { echo "<mat> folder is not found!"; exit; }
 for filename in *.mat; do

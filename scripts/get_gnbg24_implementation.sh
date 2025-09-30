@@ -1,5 +1,7 @@
 #!/bin/bash
 
+current_path="l_srtde"
+
 REPO_URL="https://github.com/VladimirStanovov/L-SRTDE_GNBG-24"
 FILENAME="gnbg24.h"
 BRANCH="master"
@@ -10,7 +12,7 @@ load_gnbg24_implementation() {
   cd tmp_repo || exit 1
   git sparse-checkout init
   git sparse-checkout set "./$FILENAME"
-  mv "./$FILENAME" "../$FILENAME"
+  mv "$current_path/$FILENAME" "../$current_path/$FILENAME"
   cd ..
   rm -rf tmp_repo
 }
