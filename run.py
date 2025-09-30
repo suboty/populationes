@@ -44,16 +44,16 @@ def run_algorithm_for_func(
             _id = optz.__name__()
             run_id[func_num][_id] = run
             print(f"{_id} | Func {func_num + 1} | Running algorithm, run {run + 1}")
-            optz.global_variables.eval_func_opt_value = fopt
-            optz.global_variables.max_eval_func_calls = gnbg.max_evals
-            optz.global_variables.result_array[
+            optz.globals.eval_func_opt_value = fopt
+            optz.globals.max_eval_func_calls = gnbg.max_evals
+            optz.globals.result_array[
                 optz.consts.records_number_per_function-1
             ] = gnbg.max_evals
             _, optimum = optz()
 
             _optimums[run] = optimum
-            res[run] = optz.global_variables.result_array
-            sr_res[run] = optz.global_variables.sr_array
+            res[run] = optz.globals.result_array
+            sr_res[run] = optz.globals.sr_array
             print(f'{_id} | Func {func_num + 1} | Run {run + 1} finished, Found optimum: {optimum}')
 
         result_dict = {
